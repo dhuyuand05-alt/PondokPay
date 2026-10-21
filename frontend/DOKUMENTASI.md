@@ -159,6 +159,8 @@ Pembelian dan operasi saldo dapat berdampak finansial. UI menunggu konfirmasi se
 
 Backend dapat meminta approval finansial untuk nominal tertentu. Jika response menyatakan approval diperlukan, ikuti alur approval yang disediakan, bukan mencoba mengirim transaksi berulang kali. Format status dan payload lengkap ada di [dokumentasi API](../backend/API_DOCUMENTATION.md).
 
+Menu **Persetujuan finansial** menyediakan tiga daftar: permintaan admin lain yang masih berlaku dan perlu ditinjau, permintaan yang dibuat admin saat ini, serta riwayat keputusan/approval kedaluwarsa. Pilih entri untuk membuka detail target, nominal, keterangan, pengaju, approver, batas waktu, dan waktu penggunaan bila sudah dikonsumsi. Tombol setujui/tolak hanya ditampilkan jika backend menyatakan `can_decide`; backend tetap memvalidasi lagi agar peminta tidak dapat menyetujui permintaannya sendiri dan permintaan kedaluwarsa tidak dapat diputuskan. Setelah disetujui, peminta masih harus mengirim transaksi yang cocok sebelum approval kedaluwarsa.
+
 ## 10. Tampilan responsif dan komponen
 
 Layout admin menggunakan navigasi dan tabel/form untuk pengelolaan data. Kasir dan wali memakai `MobileLayout` yang dioptimalkan untuk alur penggunaan ponsel. `ui.jsx` menyediakan komponen layout dan elemen visual umum; helper admin mendukung tabel, pagination, form mutasi, pencarian santri, dan modal. Komponen memakai state React untuk loading, validasi input, error, dan konfirmasi aksi.

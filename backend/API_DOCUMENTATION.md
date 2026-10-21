@@ -141,6 +141,8 @@ Semua endpoint `/api/admin` memerlukan access token admin. Endpoint mutasi diaud
 |---|---|---|
 | GET | `/api/admin/dashboard` | — |
 | GET | `/api/admin/audit-logs?page=1&limit=50` | `page`, `limit` |
+| GET | `/api/admin/financial-approvals?scope=inbox&page=1&limit=20` | Daftar permintaan; `scope`: `inbox`, `mine`, `history`, `all`; `status` opsional |
+| GET | `/api/admin/financial-approvals/:id` | Detail permintaan |
 | POST | `/api/admin/financial-approvals` | Buat permintaan approval |
 | POST | `/api/admin/financial-approvals/:id/approve` | Admin kedua menyetujui |
 | POST | `/api/admin/financial-approvals/:id/reject` | Admin kedua menolak |
@@ -217,6 +219,10 @@ Respons pembuatan:
 ```
 
 Admin peminta tidak dapat menyetujui/menolak permintaannya sendiri. Approval berlaku 24 jam, harus cocok dengan aksi, target, jumlah, dan keterangan transaksi, serta hanya dapat digunakan sekali. Keputusan mengembalikan `{"message":"Permintaan disetujui.","data":{"id":21,"status":"approved"}}` atau status `rejected`.
+
+Daftar approval mengembalikan `{ "data": [...], "pagination": { "page": 1, "limit": 20, "total": 1 } }`. `scope=inbox` hanya menampilkan permintaan berstatus menunggu yang belum kedaluwarsa dan dibuat admin lain; `scope=mine` menampilkan permintaan yang diajukan admin saat ini; `scope=history` menampilkan keputusan/approval yang telah digunakan serta permintaan kedaluwarsa; `scope=all` menampilkan seluruhnya. Default scope adalah `all`, default page `1`, default limit `20`, maksimum limit `100`. Filter `status` opsional menerima `pending`, `approved`, `rejected`, `consumed`, atau `expired`.
+
+Setiap entri daftar dan detail berisi `id`, `action`, `resource_id`, `amount`, `keterangan`, `status`, `requester_id`, `requester_username`, `approver_id`, `approver_username`, `resource_name`, `resource_detail`, `created_at`, `expires_at`, `decided_at`, `consumed_at`, dan `can_decide`. `status` untuk permintaan pending yang melewati `expires_at` disajikan sebagai `expired`, walaupun record sumber tetap pending untuk menjaga aturan transisi audit database. `can_decide` bernilai true hanya jika permintaan dibuat admin lain, masih menunggu, dan belum kedaluwarsa menurut waktu database. Detail dibungkus `{ "data": { ... } }`; ID yang tidak valid menghasilkan `400`, record yang tidak ada `404`.
 
 ### Santri
 

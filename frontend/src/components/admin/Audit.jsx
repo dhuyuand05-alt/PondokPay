@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApiData } from '../../hooks.js';
-import { Alert, formatDate, PageHeader } from '../../ui.jsx';
+import { Alert, formatDate, PageHeader, StatusBadge } from '../../ui.jsx';
 import { Table } from './shared.jsx';
 
 export function AdminAudit({ token }) {

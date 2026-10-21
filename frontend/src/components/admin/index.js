@@ -6,5 +6,5 @@ export { AdminParents } from './Parents.jsx';
 export { AdminTransactions } from './Transactions.jsx';
 export { AdminUsers } from './Users.jsx';
 export { AdminCredentials } from './Credentials.jsx';
-export { AdminApprovals } from './Approvals.jsx';
+export { AdminApprovals } from './approvals.jsx';
 export { AdminAudit } from './Audit.jsx';

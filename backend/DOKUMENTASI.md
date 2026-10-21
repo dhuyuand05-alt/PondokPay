@@ -26,6 +26,8 @@ Nilai saldo menggunakan `DECIMAL` dan umumnya dikirim sebagai string desimal, mi
 
 Dependency utama adalah Express, `mysql2`, `jsonwebtoken`, `bcryptjs`, dan `dotenv`. Versi dependency terkunci di `package-lock.json`.
 
+Untuk instalasi database kosong, gunakan [`sql/install.sql`](./sql/install.sql) dari direktori `backend`; skrip tersebut memasang semua tabel dan trigger yang dipakai aplikasi melalui `users.sql` dan `admin_api.sql`. Langkah deployment VPS lengkap terdapat di [PANDUAN_DEPLOYMENT_VPS.md](../PANDUAN_DEPLOYMENT_VPS.md).
+
 ## 3. Instalasi dan menjalankan secara lokal
 
 Dari PowerShell:
@@ -105,7 +107,13 @@ cd E:\project-akhir\backend
 npm run migrate
 ```
 
-Script migrasi menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian menjalankan pemeriksaan skema. Pada produksi, jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
+Untuk database kosong yang baru dibuat, jalankan installer SQL terlebih dahulu dari direktori `backend`:
+
+```powershell
+mysql -u root -p < sql/install.sql
+```
+
+Installer membuat database `db_cashless_santri`, seluruh tabel operasional, indeks, foreign key, dan trigger append-only. Script migrasi Node menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian memastikan/memperbarui skema. Pada produksi, jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
 
 Provision admin awal sesudah migrasi:
 
@@ -138,7 +146,7 @@ Endpoint API lengkap—termasuk parameter, bentuk body, contoh response, status 
 |---|---|
 | `/api/auth` | Login, enrollment/verifikasi MFA, dan profil sesi |
 | `/api/users` | Administrasi akun oleh admin |
-| `/api/admin` | Dashboard, santri, kantin/kasir, wali, kredensial, transaksi, approval, audit |
+| `/api/admin` | Dashboard, santri, kantin/kasir, wali, kredensial, transaksi, approval (daftar, detail, keputusan, riwayat), audit |
 | `/api/kantin` | Kantin yang ditugaskan, lookup santri, penjualan, dan riwayat kasir |
 | `/api/wali` | Profil wali, anak terhubung, riwayat, dan limit harian |
 

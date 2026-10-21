@@ -45,6 +45,8 @@ import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import { auditMutation } from '../middleware/security.js';
 import {
   approveFinancialApproval,
+  getFinancialApprovalById,
+  getFinancialApprovals,
   rejectFinancialApproval,
   requestFinancialApproval,
 } from '../services/financialApprovals.js';
@@ -56,7 +58,9 @@ router.use(auditMutation);
 
 router.get('/dashboard', getDashboard);
 router.get('/audit-logs', getAuditLogs);
+router.get('/financial-approvals', getFinancialApprovals);
 router.post('/financial-approvals', requestFinancialApproval);
+router.get('/financial-approvals/:id', getFinancialApprovalById);
 router.post('/financial-approvals/:id/approve', approveFinancialApproval);
 router.post('/financial-approvals/:id/reject', rejectFinancialApproval);
 
