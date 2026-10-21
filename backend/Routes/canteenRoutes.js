@@ -1,0 +1,30 @@
+import express from 'express';
+import {
+  getAssignedCanteen,
+  getAssignedCanteens,
+  getCanteenTransactions,
+  lookupStudent,
+} from '../controllers/canteenController.js';
+import { createCanteenSale } from '../controllers/adminController.js';
+import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
+import { requireAssignedCanteen } from '../middleware/canteenAccess.js';
+import { auditMutation } from '../middleware/security.js';
+
+const router = express.Router();
+
+router.use(authenticateToken, authorizeRoles('kasir'));
+router.use(auditMutation);
+
+router.get('/', getAssignedCanteens);
+router.post('/:id/santri/lookup', requireAssignedCanteen, lookupStudent);
+router.get('/:id', requireAssignedCanteen, getAssignedCanteen);
+router.get('/:id/saldo', requireAssignedCanteen, getAssignedCanteen);
+router.post('/:id/penjualan', requireAssignedCanteen, (req, res, next) => {
+  if (typeof req.get('Idempotency-Key') !== 'string' || !req.get('Idempotency-Key').trim()) {
+    return res.status(400).json({ message: 'Header Idempotency-Key wajib diisi untuk transaksi kasir.' });
+  }
+  next();
+}, createCanteenSale);
+router.get('/:id/transaksi', requireAssignedCanteen, getCanteenTransactions);
+
+export default router;

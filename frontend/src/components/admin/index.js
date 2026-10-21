@@ -1,0 +1,10 @@
+export { AdminDashboard } from './Dashboard.jsx';
+export { AdminStudents } from './Students.jsx';
+export { AdminStudentDetail } from './StudentDetail.jsx';
+export { AdminCanteens } from './Canteens.jsx';
+export { AdminParents } from './Parents.jsx';
+export { AdminTransactions } from './Transactions.jsx';
+export { AdminUsers } from './Users.jsx';
+export { AdminCredentials } from './Credentials.jsx';
+export { AdminApprovals } from './Approvals.jsx';
+export { AdminAudit } from './Audit.jsx';

@@ -1,0 +1,565 @@
+﻿@baseUrl = http://localhost:3000
+@kasirToken = ganti-dengan-jwt-kasir
+@waliToken = ganti-dengan-jwt-orang-tua
+@token = ganti-dengan-jwt-admin
+@mfaChallenge = ganti-dengan-challenge-token
+@mfaCode = 123456
+@adminUsername = ganti-dengan-admin-yang-diprovisikan
+@adminPassword = ganti-dengan-password-admin
+@secondAdminToken = ganti-dengan-token-admin-kedua
+@financialApprovalId = isi-dari-response-permintaan
+
+# Ganti nilai ID berikut memakai ID dari response API.
+@santriId = 10
+@santriIdKedua = 33
+@kantinId = 4
+@waliRelasiId = 26
+@waliAkunId = 26
+@credentialId = 1
+@kasirUserId = 0
+
+### Login admin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{adminUsername}}",
+  "password": "{{adminPassword}}"
+}
+
+### Jika login mengembalikan mfa_enrollment_required=true, gunakan challenge token untuk setup
+POST {{baseUrl}}/api/auth/mfa/setup
+Authorization: Bearer {{mfaChallenge}}
+
+### Verifikasi kode MFA dari aplikasi authenticator; response berisi token akses
+POST {{baseUrl}}/api/auth/mfa/verify
+Authorization: Bearer {{mfaChallenge}}
+Content-Type: application/json
+
+{
+  "code": "{{mfaCode}}"
+}
+
+### Audit log perubahan API dan status autentikasi (admin)
+GET {{baseUrl}}/api/admin/audit-logs?page=1&limit=50
+Authorization: Bearer {{token}}
+
+### Dashboard admin
+GET {{baseUrl}}/api/admin/dashboard
+Authorization: Bearer {{token}}
+
+### ==================== SANTRI ====================
+
+### Daftar santri
+GET {{baseUrl}}/api/admin/santri?page=1&limit=20
+Authorization: Bearer {{token}}
+
+### Cari santri
+GET {{baseUrl}}/api/admin/santri?search=Ahmad&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### Buat santri sekaligus akun login
+POST {{baseUrl}}/api/admin/santri
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "santri_baru",
+  "password": "password-kuat-123",
+  "nis": "S-TEST-0001",
+  "nama_lengkap": "Nama Santri Baru",
+  "asrama": "Asrama A",
+  "limit_harian": 50000
+}
+
+### Detail santri (ganti @santriId)
+GET {{baseUrl}}/api/admin/santri/{{santriId}}
+Authorization: Bearer {{token}}
+
+### Ubah data santri dengan PUT
+PUT {{baseUrl}}/api/admin/santri/{{santriId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nis": "S-TEST-0001",
+  "nama_lengkap": "Nama Santri Uji",
+  "asrama": "Asrama B",
+  "limit_harian": 60000,
+  "username": "santri_uji",
+  "password": "password-santri-uji-12345"
+}
+
+### Ubah sebagian data santri dengan PATCH
+PATCH {{baseUrl}}/api/admin/santri/{{santriId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "asrama": "Asrama C",
+  "limit_harian": 55000
+}
+
+### Top up saldo santri
+POST {{baseUrl}}/api/admin/santri/{{santriId}}/topup
+Authorization: Bearer {{token}}
+Idempotency-Key: topup-{{santriId}}-000001
+Content-Type: application/json
+
+{
+  "jumlah": 25000,
+  "keterangan": "Top up tunai"
+}
+
+### Minta persetujuan admin kedua untuk transaksi di atas ambang
+POST {{baseUrl}}/api/admin/financial-approvals
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "action": "santri_topup",
+  "resource_id": {{santriId}},
+  "jumlah": 600000,
+  "keterangan": "Top up bernilai besar"
+}
+
+### Admin kedua (akun berbeda dengan peminta) menyetujui permintaan
+POST {{baseUrl}}/api/admin/financial-approvals/{{financialApprovalId}}/approve
+Authorization: Bearer {{secondAdminToken}}
+
+### Eksekusi transaksi hanya oleh peminta; approval hanya bisa dipakai sekali
+POST {{baseUrl}}/api/admin/santri/{{santriId}}/topup
+Authorization: Bearer {{token}}
+Idempotency-Key: topup-{{santriId}}-high-0001
+Content-Type: application/json
+
+{
+  "jumlah": 600000,
+  "keterangan": "Top up bernilai besar",
+  "approval_id": {{financialApprovalId}}
+}
+
+### Tarik saldo santri
+POST {{baseUrl}}/api/admin/santri/{{santriId}}/tarik
+Authorization: Bearer {{token}}
+Idempotency-Key: tarik-{{santriId}}-000001
+Content-Type: application/json
+
+{
+  "jumlah": 5000,
+  "keterangan": "Pencairan saldo santri"
+}
+
+### Daftarkan kartu RFID santri
+POST {{baseUrl}}/api/admin/santri/{{santriId}}/kartu
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "rfid_uid": "RFID-UID-UNIK-001"
+}
+
+### Daftarkan sidik jari santri
+POST {{baseUrl}}/api/admin/santri/{{santriId}}/sidik-jari
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fingerprint_id": 12345
+}
+
+### Nonaktifkan santri (saldo dan riwayat transaksi tetap tersimpan)
+DELETE {{baseUrl}}/api/admin/santri/{{santriId}}
+Authorization: Bearer {{token}}
+
+### ==================== KANTIN ====================
+
+### Daftar kantin
+GET {{baseUrl}}/api/admin/kantin
+Authorization: Bearer {{token}}
+
+### Buat kantin
+POST {{baseUrl}}/api/admin/kantin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nama": "Kantin Putri",
+  "lokasi": "Area asrama putri",
+  "status": "active"
+}
+
+### Detail kantin
+GET {{baseUrl}}/api/admin/kantin/{{kantinId}}
+Authorization: Bearer {{token}}
+
+### Ubah data kantin dengan PUT
+PUT {{baseUrl}}/api/admin/kantin/{{kantinId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nama": "Kantin Putra Utama",
+  "lokasi": "Gedung asrama putra",
+  "status": "active"
+}
+
+### Ubah sebagian data kantin dengan PATCH
+PATCH {{baseUrl}}/api/admin/kantin/{{kantinId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "inactive"
+}
+
+### Catat transaksi belanja santri; saldo kantin otomatis bertambah
+POST {{baseUrl}}/api/admin/kantin/{{kantinId}}/penjualan
+Authorization: Bearer {{token}}
+Idempotency-Key: admin-sale-000001
+Content-Type: application/json
+
+{
+  "santri_id": {{santriId}},
+  "jumlah": 12000,
+  "keterangan": "Belanja makan"
+}
+
+### Cairkan saldo kantin
+POST {{baseUrl}}/api/admin/kantin/{{kantinId}}/pencairan
+Authorization: Bearer {{token}}
+Idempotency-Key: payout-{{kantinId}}-000001
+Content-Type: application/json
+
+{
+  "jumlah": 1000,
+  "keterangan": "Pencairan hasil penjualan"
+}
+
+### Riwayat saldo/transaksi kantin
+GET {{baseUrl}}/api/admin/kantin/{{kantinId}}/transaksi?page=1&limit=20
+Authorization: Bearer {{token}}
+
+### Nonaktifkan kantin (saldo dan riwayat tetap tersimpan)
+DELETE {{baseUrl}}/api/admin/kantin/{{kantinId}}
+Authorization: Bearer {{token}}
+
+### ==================== TRANSAKSI ====================
+
+### Daftar seluruh transaksi
+GET {{baseUrl}}/api/admin/transaksi?page=1&limit=20
+Authorization: Bearer {{token}}
+
+### Filter transaksi berdasarkan santri
+GET {{baseUrl}}/api/admin/transaksi?santri_id={{santriId}}&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### Filter transaksi berdasarkan jenis (belanja, topup, tarik)
+GET {{baseUrl}}/api/admin/transaksi?tipe_transaksi=topup&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### ==================== WALI SANTRI (DATA RELASI) ====================
+
+### Daftar relasi wali-santri
+GET {{baseUrl}}/api/admin/wali
+Authorization: Bearer {{token}}
+
+### Buat data wali dan akun login yang terhubung ke satu santri
+POST {{baseUrl}}/api/admin/wali
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "wali_santri_baru",
+  "password": "password-wali-123",
+  "santri_id": {{santriId}},
+  "no_whatsapp": "081234567890"
+}
+
+### Detail relasi wali-santri
+GET {{baseUrl}}/api/admin/wali/{{waliRelasiId}}
+Authorization: Bearer {{token}}
+
+### Ubah relasi wali-santri dengan PUT (username dan password harus dikirim bersama)
+PUT {{baseUrl}}/api/admin/wali/{{waliRelasiId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "wali_santri_baru",
+  "password": "password-wali-baru-123",
+  "santri_id": {{santriId}},
+  "no_whatsapp": "081234567891"
+}
+
+### Ubah sebagian relasi wali-santri dengan PATCH
+PATCH {{baseUrl}}/api/admin/wali/{{waliRelasiId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "no_whatsapp": "081234567892"
+}
+
+### Hapus data relasi wali-santri dan akun login jika tidak lagi punya relasi
+DELETE {{baseUrl}}/api/admin/wali/{{waliRelasiId}}
+Authorization: Bearer {{token}}
+
+### ==================== AKUN ORANG TUA + HUBUNGAN ANAK ====================
+
+### Daftar akun orang tua dan anak-anak yang terhubung
+GET {{baseUrl}}/api/admin/wali-akun
+Authorization: Bearer {{token}}
+
+### Buat akun orang tua dengan satu atau beberapa anak
+POST {{baseUrl}}/api/admin/wali-akun
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "orang_tua_baru",
+  "password": "password-orang-tua-123",
+  "santri_ids": [{{santriId}}, {{santriIdKedua}}],
+  "no_whatsapp": "081234567890"
+}
+
+### Detail akun orang tua beserta anak-anak
+GET {{baseUrl}}/api/admin/wali-akun/{{waliAkunId}}
+Authorization: Bearer {{token}}
+
+### Ubah sebagian akun orang tua dengan PATCH
+PATCH {{baseUrl}}/api/admin/wali-akun/{{waliAkunId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "no_whatsapp": "081234567892"
+}
+
+### Ubah username/password/nomor WhatsApp akun orang tua
+PUT {{baseUrl}}/api/admin/wali-akun/{{waliAkunId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "orang_tua_diperbarui",
+  "password": "password-orang-tua-baru-123",
+  "no_whatsapp": "081234567891"
+}
+
+### Tambahkan hubungan anak ke akun orang tua
+POST {{baseUrl}}/api/admin/wali-akun/{{waliAkunId}}/anak
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "santri_id": {{santriIdKedua}},
+  "no_whatsapp": "081234567891"
+}
+
+### Lepaskan hubungan anak dari akun orang tua
+DELETE {{baseUrl}}/api/admin/wali-akun/{{waliAkunId}}/anak/{{santriIdKedua}}
+Authorization: Bearer {{token}}
+
+### Hapus akun orang tua beserta semua relasi anak
+DELETE {{baseUrl}}/api/admin/wali-akun/{{waliAkunId}}
+Authorization: Bearer {{token}}
+
+### ==================== KREDENSIAL RFID/FINGERPRINT ====================
+
+### Daftar seluruh kredensial santri
+GET {{baseUrl}}/api/admin/credentials
+Authorization: Bearer {{token}}
+
+### Buat satu atau beberapa jenis kredensial lewat endpoint umum
+POST {{baseUrl}}/api/admin/credentials
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "santri_id": {{santriId}},
+  "rfid_uid": "RFID-UID-UNIK-002",
+  "fingerprint_id": 12346,
+  "status": "active"
+}
+
+### Detail kredensial
+GET {{baseUrl}}/api/admin/credentials/{{credentialId}}
+Authorization: Bearer {{token}}
+
+### Ubah kredensial dengan PUT
+PUT {{baseUrl}}/api/admin/credentials/{{credentialId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "santri_id": {{santriId}},
+  "rfid_uid": "RFID-UID-UNIK-003",
+  "fingerprint_id": 12347,
+  "status": "active"
+}
+
+### Ubah sebagian kredensial dengan PATCH (contoh blokir)
+PATCH {{baseUrl}}/api/admin/credentials/{{credentialId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "blocked"
+}
+
+### Hapus kredensial
+DELETE {{baseUrl}}/api/admin/credentials/{{credentialId}}
+Authorization: Bearer {{token}}
+
+### ==================== PENUGASAN AKUN KASIR ====================
+
+### Buat akun kasir lewat endpoint admin user (set role kasir)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "kasir_uji",
+  "password": "password-kasir-123",
+  "role": "kasir"
+}
+
+### Daftar kasir yang ditugaskan ke kantin
+GET {{baseUrl}}/api/admin/kantin/{{kantinId}}/kasir
+Authorization: Bearer {{token}}
+
+### Tugaskan akun role kasir ke kantin
+POST {{baseUrl}}/api/admin/kantin/{{kantinId}}/kasir
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "user_id": {{kasirUserId}}
+}
+
+### Cabut penugasan kasir dari kantin
+DELETE {{baseUrl}}/api/admin/kantin/{{kantinId}}/kasir/{{kasirUserId}}
+Authorization: Bearer {{token}}
+
+### ==================== API KASIR ====================
+
+### Login kasir (ambil token lalu isi @kasirToken)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "kasir_uji",
+  "password": "password-kasir-123"
+}
+
+### Daftar kantin yang ditugaskan ke kasir
+GET {{baseUrl}}/api/kantin
+Authorization: Bearer {{kasirToken}}
+
+### Detail kantin dan saldo
+GET {{baseUrl}}/api/kantin/{{kantinId}}
+Authorization: Bearer {{kasirToken}}
+
+### Saldo kantin
+GET {{baseUrl}}/api/kantin/{{kantinId}}/saldo
+Authorization: Bearer {{kasirToken}}
+
+### Cari santri dengan kartu RFID aktif
+POST {{baseUrl}}/api/kantin/{{kantinId}}/santri/lookup
+Authorization: Bearer {{kasirToken}}
+Content-Type: application/json
+
+{
+  "rfid_uid": "RFID-UID-UNIK-001"
+}
+
+### Cari santri dengan NIS
+POST {{baseUrl}}/api/kantin/{{kantinId}}/santri/lookup
+Authorization: Bearer {{kasirToken}}
+Content-Type: application/json
+
+{
+  "nis": "S-TEST-0001"
+}
+
+### Cari santri dengan fingerprint yang aktif
+POST {{baseUrl}}/api/kantin/{{kantinId}}/santri/lookup
+Authorization: Bearer {{kasirToken}}
+Content-Type: application/json
+
+{
+  "fingerprint_id": 12345
+}
+
+### Catat penjualan (Idempotency-Key wajib; key unik untuk setiap transaksi)
+POST {{baseUrl}}/api/kantin/{{kantinId}}/penjualan
+Authorization: Bearer {{kasirToken}}
+Idempotency-Key: test-penjualan-001
+Content-Type: application/json
+
+{
+  "santri_id": {{santriId}},
+  "jumlah": 12000,
+  "keterangan": "Belanja makan"
+}
+
+### Retry penjualan yang sama jika respons sebelumnya timeout (key dan body harus sama)
+POST {{baseUrl}}/api/kantin/{{kantinId}}/penjualan
+Authorization: Bearer {{kasirToken}}
+Idempotency-Key: test-penjualan-001
+Content-Type: application/json
+
+{
+  "santri_id": {{santriId}},
+  "jumlah": 12000,
+  "keterangan": "Belanja makan"
+}
+
+### Riwayat penjualan dan pencairan kantin
+GET {{baseUrl}}/api/kantin/{{kantinId}}/transaksi?page=1&limit=20
+Authorization: Bearer {{kasirToken}}
+
+### Filter riwayat penjualan
+GET {{baseUrl}}/api/kantin/{{kantinId}}/transaksi?tipe_transaksi=penjualan&page=1&limit=20
+Authorization: Bearer {{kasirToken}}
+
+### Filter riwayat pencairan kantin (admin)
+GET {{baseUrl}}/api/admin/kantin/{{kantinId}}/transaksi?tipe_transaksi=pencairan&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### ==================== API ORANG TUA ====================
+
+### Login orang tua (ambil token lalu isi @waliToken)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "orang_tua_baru",
+  "password": "password-orang-tua-123"
+}
+
+### Profil orang tua dan anak yang terhubung
+GET {{baseUrl}}/api/wali/me
+Authorization: Bearer {{waliToken}}
+
+### Daftar anak, saldo, dan belanja hari ini
+GET {{baseUrl}}/api/wali/anak
+Authorization: Bearer {{waliToken}}
+
+### Detail anak beserta saldo dan limit harian
+GET {{baseUrl}}/api/wali/anak/{{santriId}}
+Authorization: Bearer {{waliToken}}
+
+### Riwayat transaksi anak
+GET {{baseUrl}}/api/wali/anak/{{santriId}}/transaksi?page=1&limit=20
+Authorization: Bearer {{waliToken}}
+
+### Atur limit belanja harian anak (PUT juga tersedia)
+PATCH {{baseUrl}}/api/wali/anak/{{santriId}}/limit-harian
+Authorization: Bearer {{waliToken}}
+Content-Type: application/json
+
+{
+  "limit_harian": 30000
+}
