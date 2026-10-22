@@ -4,8 +4,8 @@ import {
   getAssignedCanteens,
   getCanteenTransactions,
   lookupStudent,
-} from '../controllers/canteenController.js';
-import { createCanteenSale } from '../controllers/adminController.js';
+} from '../Controllers/canteenController.js';
+import { createCanteenSale } from '../Controllers/adminController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import { requireAssignedCanteen } from '../middleware/canteenAccess.js';
 import { auditMutation } from '../middleware/security.js';

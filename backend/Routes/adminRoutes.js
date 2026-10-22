@@ -40,7 +40,7 @@ import {
   removeCanteenCashier,
   registerStudentCard,
   registerStudentFingerprint,
-} from '../controllers/adminController.js';
+} from '../Controllers/adminController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import { auditMutation } from '../middleware/security.js';
 import {

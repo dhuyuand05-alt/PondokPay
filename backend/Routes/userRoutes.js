@@ -5,7 +5,7 @@ import {
   getAllUsers,
   getUserById,
   updateUser,
-} from '../controllers/userController.js';
+} from '../Controllers/userController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import { auditMutation } from '../middleware/security.js';
 

@@ -5,7 +5,7 @@ import {
   getChildTransactions,
   getParentProfile,
   updateChildDailyLimit,
-} from '../controllers/parentController.js';
+} from '../Controllers/parentController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import { auditMutation } from '../middleware/security.js';
 

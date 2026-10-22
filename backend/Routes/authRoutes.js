@@ -1,5 +1,5 @@
 import express from 'express';
-import { login, getProfile, setupMfa, verifyMfa } from '../controllers/authController.js';
+import { login, getProfile, setupMfa, verifyMfa } from '../Controllers/authController.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { rateLimitLogin, rateLimitMfa } from '../middleware/security.js';
 

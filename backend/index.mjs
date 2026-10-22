@@ -1,11 +1,11 @@
 import express from 'express';
 import 'dotenv/config';
 import { getFinancialApprovalThreshold, getJwtSecret, getMfaEncryptionKey } from './config/security.js';
-import authRoutes from './routes/authRoutes.js';
-import userRoutes from './routes/userRoutes.js';
-import adminRoutes from './routes/adminRoutes.js';
-import canteenRoutes from './routes/canteenRoutes.js';
-import parentRoutes from './routes/parentRoutes.js';
+import authRoutes from './Routes/authRoutes.js';
+import userRoutes from './Routes/userRoutes.js';
+import adminRoutes from './Routes/adminRoutes.js';
+import canteenRoutes from './Routes/canteenRoutes.js';
+import parentRoutes from './Routes/parentRoutes.js';
 import pool, { ensureAdminSchema } from './config/db.js';
 import {
   rateLimitApi,
