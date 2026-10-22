@@ -23,6 +23,8 @@ import {
   getKantin,
   getKantinById,
   getSantri,
+  exportSantri,
+  importSantri,
   getSantriById,
   getTransactions,
   getWali,
@@ -69,6 +71,8 @@ router.post('/financial-approvals/:id/approve', approveFinancialApproval);
 router.post('/financial-approvals/:id/reject', rejectFinancialApproval);
 
 router.get('/santri', getSantri);
+router.get('/santri/export', exportSantri);
+router.post('/santri/import', importSantri);
 router.post('/santri', createSantri);
 router.get('/santri/:id', getSantriById);
 router.put('/santri/:id', updateSantri);

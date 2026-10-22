@@ -229,6 +229,8 @@ Setiap entri daftar dan detail berisi `id`, `action`, `resource_id`, `amount`, `
 | Method | Path | Kegunaan/input utama |
 |---|---|---|
 | GET | `/api/admin/santri?page=1&limit=20&search=...` | Daftar/cari berdasarkan NIS, nama, asrama, username |
+| GET | `/api/admin/santri/export` | Ekspor semua NIS, nama, asrama, dan limit harian |
+| POST | `/api/admin/santri/import` | Impor 1–25 profil santri tanpa akun login |
 | POST | `/api/admin/santri` | Buat santri dan akun login |
 | GET | `/api/admin/santri/:id` | Detail |
 | PUT / PATCH | `/api/admin/santri/:id` | Ubah sebagian/seluruh properti |
@@ -239,6 +241,8 @@ Setiap entri daftar dan detail berisi `id`, `action`, `resource_id`, `amount`, `
 | POST | `/api/admin/santri/:id/sidik-jari` | Daftarkan ID fingerprint |
 
 Buat santri memerlukan `username`, `password`, `nis`, `nama_lengkap`; `asrama` opsional dan `limit_harian` default `50000`.
+
+Impor menerima `{ "rows": [{ "row_number": 2, "nis": "S-0011", "nama_lengkap": "Nama Santri", "asrama": "Asrama A", "limit_harian": "50000" }] }`. Kolom `row_number` hanya untuk pelaporan; `asrama` dan `limit_harian` opsional, dengan limit kosong memakai `50000`. Setiap permintaan menerima maksimal 25 baris dan membalas hasil `imported`, `skipped` (NIS duplikat), dan `invalid`. Impor hanya membuat profil baru tanpa akun pengguna dan tidak mengubah saldo, limit akun lama, atau transaksi. Ekspor hanya menyertakan data identitas yang menjadi kolom impor.
 
 ```json
 {

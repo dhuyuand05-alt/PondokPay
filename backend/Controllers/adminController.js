@@ -170,6 +170,85 @@ export const getSantri = async (req, res) => {
   }
 };
 
+export const exportSantri = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT nis, nama_lengkap, asrama, limit_harian
+       FROM santri
+       ORDER BY nama_lengkap, nis`
+    );
+    return res.status(200).json({ data: rows });
+  } catch (error) {
+    console.error('Export santri error:', error);
+    return res.status(500).json({ message: 'Gagal mengekspor data santri.' });
+  }
+};
+
+export const importSantri = async (req, res) => {
+  const { rows } = req.body;
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 25) {
+    return res.status(400).json({ message: 'Impor harus berisi 1 sampai 25 baris per permintaan.' });
+  }
+
+  const imported = [];
+  const skipped = [];
+  const invalid = [];
+  const preparedRows = rows.map((row, index) => {
+    const rowNumber = Number.isSafeInteger(row?.row_number) && row.row_number >= 2
+      ? row.row_number
+      : index + 2;
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      invalid.push({ row_number: rowNumber, reason: 'Format baris tidak valid.' });
+      return null;
+    }
+    const nis = typeof row.nis === 'string' ? row.nis.trim() : '';
+    const namaLengkap = typeof row.nama_lengkap === 'string' ? row.nama_lengkap.trim() : '';
+    const asrama = typeof row.asrama === 'string' ? row.asrama.trim() : '';
+    const limitInput = typeof row.limit_harian === 'string' && !row.limit_harian.trim()
+      ? 50000
+      : row.limit_harian ?? 50000;
+    const limit = parseMoney(limitInput, 'limit_harian');
+
+    if (!nis || nis.length > 30) {
+      invalid.push({ row_number: rowNumber, reason: 'NIS wajib diisi dan maksimal 30 karakter.' });
+    } else if (!namaLengkap || namaLengkap.length > 100) {
+      invalid.push({ row_number: rowNumber, reason: 'Nama wajib diisi dan maksimal 100 karakter.' });
+    } else if (asrama.length > 50) {
+      invalid.push({ row_number: rowNumber, reason: 'Asrama maksimal 50 karakter.' });
+    } else if (limit.error) {
+      invalid.push({ row_number: rowNumber, reason: limit.error });
+    } else {
+      return { row_number: rowNumber, nis, namaLengkap, asrama, limit: limit.value };
+    }
+    return null;
+  }).filter(Boolean);
+
+  try {
+    await runInTransaction(async (connection) => {
+      for (const row of preparedRows) {
+        try {
+          await connection.query(
+            `INSERT INTO santri (nis, nama_lengkap, asrama, limit_harian)
+             VALUES (?, ?, ?, ?)`,
+            [row.nis, row.namaLengkap, row.asrama || null, row.limit]
+          );
+          imported.push({ row_number: row.row_number, nis: row.nis });
+        } catch (error) {
+          if (!duplicateError(error)) throw error;
+          skipped.push({ row_number: row.row_number, nis: row.nis, reason: 'NIS sudah terdaftar.' });
+        }
+      }
+    });
+    return res.status(200).json({
+      message: 'Impor data santri selesai.',
+      data: { imported, skipped, invalid },
+    });
+  } catch (error) {
+    console.error('Import santri error:', error);
+    return res.status(500).json({ message: 'Gagal mengimpor data santri.' });
+  }
+};
+
 export const getSantriById = async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) return res.status(400).json({ message: 'ID santri tidak valid.' });

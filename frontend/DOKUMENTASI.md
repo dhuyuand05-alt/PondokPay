@@ -95,7 +95,7 @@ Prefix halaman: `/admin`.
 | Route | Halaman |
 |---|---|
 | `/admin` | Ringkasan dashboard dan transaksi terbaru |
-| `/admin/santri` | Daftar, pencarian, dan pembuatan santri |
+| `/admin/santri` | Daftar, pencarian, pembuatan, impor CSV, dan ekspor data identitas santri |
 | `/admin/santri/:id` | Detail santri, akun/kredensial, transaksi, top-up, penarikan, dan pendaftaran identifier |
 | `/admin/kantin` | Pengelolaan kantin, penugasan kasir, transaksi, dan pencairan |
 | `/admin/wali` | Akun wali dan relasi dengan anak |
@@ -164,6 +164,8 @@ Menu **Persetujuan finansial** menyediakan tiga daftar: permintaan admin lain ya
 ## 10. Tampilan responsif dan komponen
 
 Layout admin menggunakan navigasi dan tabel/form untuk pengelolaan data. Kasir dan wali memakai `MobileLayout` yang dioptimalkan untuk alur penggunaan ponsel. `ui.jsx` menyediakan komponen layout dan elemen visual umum; helper admin mendukung tabel, pagination, form mutasi, pencarian santri, dan modal. Komponen memakai state React untuk loading, validasi input, error, dan konfirmasi aksi.
+
+Menu **Data santri** dapat mengimpor CSV UTF-8 dengan kolom `nis`, `nama_lengkap`, `asrama`, dan `limit_harian`, serta mengekspor seluruh data identitas tersebut. Impor membuat profil tanpa akun login, melewati NIS yang sudah terdaftar, dan melaporkan baris yang tidak valid. File impor dibatasi 1 MB dan 500 baris; saldo serta riwayat transaksi tidak disertakan atau diubah.
 
 Saat mengubah UI, jaga agar pesan loading/error/kosong tetap terlihat; tombol submit tidak boleh mengizinkan pengiriman ganda saat mutasi sedang berlangsung. Pertahankan tampilan mobile dan desktop serta label yang dapat dipahami pengguna.
 
