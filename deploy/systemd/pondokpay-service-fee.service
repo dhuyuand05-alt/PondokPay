@@ -1,0 +1,16 @@
+[Unit]
+Description=Process monthly PondokPay student service fees
+After=mysql.service
+Requires=mysql.service
+
+[Service]
+Type=oneshot
+User=pondokpay
+Group=pondokpay
+WorkingDirectory=/var/www/pondokpay/backend
+EnvironmentFile=/etc/pondokpay/backend.env
+ExecStart=/usr/bin/node scripts/chargeMonthlyServiceFees.js
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run PondokPay monthly service-fee processing
+
+[Timer]
+OnCalendar=*-*-01 00:15:00 Asia/Jakarta
+Persistent=true
+Unit=pondokpay-service-fee.service
+
+[Install]
+WantedBy=timers.target

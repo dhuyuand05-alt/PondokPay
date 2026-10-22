@@ -3,9 +3,10 @@ import pool from '../config/db.js';
 import { validatePassword } from '../config/passwords.js';
 import { consumeCanteenPayoutApproval } from '../services/canteenPayoutApprovals.js';
 import { consumeFinancialApproval } from '../services/financialApprovals.js';
+import { collectCurrentServiceFeeDebt } from '../services/monthlyServiceFees.js';
 
 const validCredentialStatuses = ['active', 'blocked'];
-const validTransactionTypes = ['belanja', 'topup', 'tarik'];
+const validTransactionTypes = ['belanja', 'topup', 'tarik', 'biaya_layanan'];
 const maxPageSize = 100;
 
 const parseId = (value) => {
@@ -726,6 +727,11 @@ export const createTopup = async (req, res) => {
          VALUES (?, 'topup', ?, ?, ?, ?, ?)`,
         [santriId, amount.value, updatedBalance, keterangan, idempotencyKey, req.user.id]
       );
+      const serviceFee = await collectCurrentServiceFeeDebt(connection, {
+        santriId,
+        balance: updatedBalance,
+        createdBy: req.user.id,
+      });
       return {
         id: result.insertId,
         santri_id: santriId,
@@ -733,6 +739,7 @@ export const createTopup = async (req, res) => {
         jumlah: amount.value,
         saldo_akhir: updatedBalance,
         keterangan,
+        service_fee_collected: serviceFee?.amount ?? '0.00',
       };
     });
     if (!transaction) return res.status(404).json({ message: 'Data santri tidak ditemukan.' });

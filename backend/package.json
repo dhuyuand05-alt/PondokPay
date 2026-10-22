@@ -7,6 +7,7 @@
     "test": "node --test",
     "start": "node --watch index.mjs",
     "dev": "node --watch index.mjs",
+    "service-fee:charge": "node scripts/chargeMonthlyServiceFees.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "migrate": "node scripts/migrate.js",
     "backup": "node scripts/backupDatabase.js",

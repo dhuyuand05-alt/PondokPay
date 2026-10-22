@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS transaksi (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     santri_id INT DEFAULT NULL,
     kantin_id INT DEFAULT NULL,
-    tipe_transaksi ENUM('belanja', 'topup', 'tarik') NOT NULL,
+    tipe_transaksi ENUM('belanja', 'topup', 'tarik', 'biaya_layanan') NOT NULL,
     jumlah DECIMAL(10,2) NOT NULL,
     saldo_akhir DECIMAL(12,2) NOT NULL,
     created_by INT DEFAULT NULL,
@@ -108,6 +108,52 @@ CREATE TABLE IF NOT EXISTS kantin_kasir (
         REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS service_fee_rates (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    amount DECIMAL(10,2) NOT NULL,
+    effective_from DATE NOT NULL,
+    created_by INT DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_service_fee_rates_effective (effective_from, id),
+    CONSTRAINT fk_service_fee_rate_creator FOREIGN KEY (created_by)
+        REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS service_fee_charges (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    santri_id INT NOT NULL,
+    billing_period DATE NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    status ENUM('unpaid', 'paid', 'forgiven') NOT NULL DEFAULT 'unpaid',
+    paid_at TIMESTAMP DEFAULT NULL,
+    forgiven_at TIMESTAMP DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_service_fee_student_period (santri_id, billing_period),
+    INDEX idx_service_fee_status_period (status, billing_period),
+    CONSTRAINT fk_service_fee_charge_santri FOREIGN KEY (santri_id)
+        REFERENCES santri(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS admin_cash_entries (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    direction ENUM('income', 'expense') NOT NULL,
+    category VARCHAR(80) NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    description VARCHAR(500) NOT NULL,
+    service_fee_charge_id BIGINT DEFAULT NULL UNIQUE,
+    reverses_entry_id BIGINT DEFAULT NULL UNIQUE,
+    idempotency_key VARCHAR(64) DEFAULT NULL UNIQUE,
+    created_by INT DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_admin_cash_created (created_at, id),
+    CONSTRAINT fk_admin_cash_fee_charge FOREIGN KEY (service_fee_charge_id)
+        REFERENCES service_fee_charges(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_admin_cash_reversal FOREIGN KEY (reverses_entry_id)
+        REFERENCES admin_cash_entries(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_admin_cash_creator FOREIGN KEY (created_by)
+        REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS canteen_payout_approvals (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     kantin_id INT NOT NULL,
@@ -136,6 +182,12 @@ DROP TRIGGER IF EXISTS trg_transaksi_no_delete;
 DROP TRIGGER IF EXISTS trg_kantin_transaksi_no_update;
 DROP TRIGGER IF EXISTS trg_kantin_transaksi_no_delete;
 DROP TRIGGER IF EXISTS trg_canteen_payout_approval_protect_update;
+DROP TRIGGER IF EXISTS trg_admin_cash_no_update;
+DROP TRIGGER IF EXISTS trg_admin_cash_no_delete;
+DROP TRIGGER IF EXISTS trg_service_fee_charge_protect_update;
+DROP TRIGGER IF EXISTS trg_service_fee_charge_no_delete;
+DROP TRIGGER IF EXISTS trg_service_fee_rates_immutable;
+DROP TRIGGER IF EXISTS trg_service_fee_rates_no_delete;
 
 DELIMITER $$
 
@@ -169,6 +221,69 @@ FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Financial ledger rows are append-only';
+END$$
+
+CREATE TRIGGER trg_admin_cash_no_update
+BEFORE UPDATE ON admin_cash_entries
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Admin cash ledger rows are append-only';
+END$$
+
+CREATE TRIGGER trg_admin_cash_no_delete
+BEFORE DELETE ON admin_cash_entries
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Admin cash ledger rows are append-only';
+END$$
+
+CREATE TRIGGER trg_service_fee_rates_immutable
+BEFORE UPDATE ON service_fee_rates
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Service fee rate history is append-only';
+END$$
+
+CREATE TRIGGER trg_service_fee_rates_no_delete
+BEFORE DELETE ON service_fee_rates
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Service fee rate history is append-only';
+END$$
+
+CREATE TRIGGER trg_service_fee_charge_protect_update
+BEFORE UPDATE ON service_fee_charges
+FOR EACH ROW
+BEGIN
+    IF NOT (NEW.santri_id <=> OLD.santri_id)
+        OR NOT (NEW.billing_period <=> OLD.billing_period)
+        OR NOT (NEW.amount <=> OLD.amount)
+        OR NOT (NEW.created_at <=> OLD.created_at)
+        OR NOT (
+            (OLD.status = 'unpaid' AND NEW.status IN ('paid', 'forgiven')
+                AND (
+                    (NEW.status = 'paid' AND NEW.paid_at IS NOT NULL AND NEW.forgiven_at IS NULL)
+                    OR (NEW.status = 'forgiven' AND NEW.paid_at IS NULL AND NEW.forgiven_at IS NOT NULL)
+                ))
+            OR (OLD.status <=> NEW.status AND OLD.paid_at <=> NEW.paid_at
+                AND OLD.forgiven_at <=> NEW.forgiven_at)
+        )
+    THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Service fee charge records are immutable';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_service_fee_charge_no_delete
+BEFORE DELETE ON service_fee_charges
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Service fee charge records are immutable';
 END$$
 
 CREATE TRIGGER trg_canteen_payout_approval_protect_update

@@ -56,6 +56,12 @@ import {
   getCanteenPayoutApprovalsForAdmin,
   requestCanteenPayoutApproval,
 } from '../services/canteenPayoutApprovals.js';
+import {
+  createAdminExpense,
+  getAdminCash,
+  reverseAdminCashEntry,
+  setMonthlyServiceFee,
+} from '../Controllers/adminFinanceController.js';
 
 const router = express.Router();
 
@@ -69,6 +75,11 @@ router.post('/financial-approvals', requestFinancialApproval);
 router.get('/financial-approvals/:id', getFinancialApprovalById);
 router.post('/financial-approvals/:id/approve', approveFinancialApproval);
 router.post('/financial-approvals/:id/reject', rejectFinancialApproval);
+
+router.get('/cash', getAdminCash);
+router.post('/cash/service-fee', setMonthlyServiceFee);
+router.post('/cash/expenses', createAdminExpense);
+router.post('/cash/entries/:id/reverse', reverseAdminCashEntry);
 
 router.get('/santri', getSantri);
 router.get('/santri/export', exportSantri);

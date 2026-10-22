@@ -44,6 +44,7 @@ export function AdminTransactions({ token }) {
           <option value="belanja">Belanja</option>
           <option value="topup">Top up</option>
           <option value="tarik">Penarikan</option>
+          <option value="biaya_layanan">Biaya layanan</option>
         </SelectField>
         <button
           className="btn-primary"

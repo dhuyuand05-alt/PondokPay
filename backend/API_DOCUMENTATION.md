@@ -295,6 +295,19 @@ Daftarkan kartu dengan `{ "rfid_uid": "RFID-UID-UNIK" }`; sidik jari dengan `{ "
 
 Fingerprint response memakai `fingerprint_id` alih-alih `rfid_uid`. Nilai ini hanya identifier; API tidak menyimpan template atau citra biometrik.
 
+### Kas admin dan biaya layanan
+
+| Method | Path | Kegunaan/input utama |
+|---|---|---|
+| GET | `/api/admin/cash?page=1&limit=20` | Ringkasan kas, tarif aktif/terjadwal, utang biaya bulan berjalan, dan riwayat |
+| POST | `/api/admin/cash/service-fee` | Atur tarif seragam per santri; berlaku tanggal 1 bulan berikutnya |
+| POST | `/api/admin/cash/expenses` | Catat pengeluaran dengan `category`, `amount`, `description` dan `Idempotency-Key` |
+| POST | `/api/admin/cash/entries/:id/reverse` | Buat pembalik penuh untuk catatan yang keliru; wajib `reason` dan `Idempotency-Key` |
+
+Pengaturan tarif menerima `{ "amount": 5000 }`; nilai `0` menonaktifkan tagihan mulai periode berikutnya. Job bulanan pada tanggal 1 pukul 00:15 WIB menagih santri aktif. Jika saldo mencukupi, sistem membuat transaksi `biaya_layanan` dan pemasukan kas secara atomik; jika tidak, tagihan berstatus belum tertagih. Top-up pada bulan yang sama akan melunasi tagihan hanya jika saldo setelah top-up mencukupi seluruh tunggakan bulan berjalan. Tunggakan yang belum lunas hangus ketika periode bulan berikutnya diproses. Pengulangan job aman/idempoten.
+
+Pemasukan kas hanya dicatat ketika biaya benar-benar tertagih, bukan saat tagihan dibuat. Pengeluaran dan biaya tertagih disimpan append-only; koreksi membuat catatan pembalik senilai penuh dan catatan asli tetap terlihat. Saldo kas adalah pemasukan dikurangi pengeluaran dan koreksi.
+
 ### Kantin dan penugasan kasir
 
 | Method | Path | Kegunaan |
@@ -339,7 +352,7 @@ Permintaan konfirmasi kasir berlaku 24 jam dan hanya dapat diputuskan sekali ole
 | GET | `/api/admin/transaksi?page=1&limit=20` | `santri_id`, `tipe_transaksi` opsional |
 | GET | `/api/admin/kantin/:id/transaksi?page=1&limit=20` | `tipe_transaksi=penjualan` atau `pencairan` |
 
-`GET /api/admin/transaksi` menerima tipe `belanja`, `topup`, atau `tarik`. Entri transaksi admin berisi `id`, `santri_id`, `kantin_id`, `nama_kantin`, `nis`, `nama_lengkap`, `tipe_transaksi`, `jumlah`, `saldo_akhir`, `keterangan`, `created_at`.
+`GET /api/admin/transaksi` menerima tipe `belanja`, `topup`, `tarik`, atau `biaya_layanan`. Entri transaksi admin berisi `id`, `santri_id`, `kantin_id`, `nama_kantin`, `nis`, `nama_lengkap`, `tipe_transaksi`, `jumlah`, `saldo_akhir`, `keterangan`, `created_at`.
 
 Riwayat kantin mengembalikan `{ "data": [...], "pagination": {...} }`; entri memiliki `id`, `kantin_id`, `transaksi_id`, `tipe_transaksi`, `jumlah`, `saldo_akhir`, `keterangan`, `created_at`, `santri_id`, `nis`, `nama_lengkap`. Untuk transaksi pencairan, kolom terkait santri dapat bernilai `null`.
 

@@ -234,6 +234,7 @@ export function typeName(type) {
       belanja: 'Belanja',
       topup: 'Top up',
       tarik: 'Penarikan',
+      biaya_layanan: 'Biaya layanan',
       penjualan: 'Penjualan',
       pencairan: 'Pencairan',
     }[type] ||

@@ -6,8 +6,17 @@ import {
   AdminLayout, Alert, Brand, Field, Loading, MobileLayout,
 } from './ui.jsx';
 import {
-  AdminApprovals, AdminAudit, AdminDashboard, AdminCanteens, AdminCredentials,
-  AdminParents, AdminStudentDetail, AdminStudents, AdminTransactions, AdminUsers,
+  AdminApprovals,
+  AdminAudit,
+  AdminCash,
+  AdminDashboard,
+  AdminCanteens,
+  AdminCredentials,
+  AdminParents,
+  AdminStudentDetail,
+  AdminStudents,
+  AdminTransactions,
+  AdminUsers,
 } from './components/admin/index.js';
 import { CashierAccount, CashierHome, CashierHistory } from './components/cashier/index.js';
 import { ParentHome, ParentHistory, ParentLimit } from './components/parent/index.js';
@@ -175,6 +184,7 @@ function SessionRoutes({ session, onLogout }) {
           <Route path="credentials" element={<AdminCredentials token={token} />} />
           <Route path="approvals" element={<AdminApprovals token={token} />} />
           <Route path="audit" element={<AdminAudit token={token} />} />
+          <Route path="cash" element={<AdminCash token={token} />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/admin" replace />} />

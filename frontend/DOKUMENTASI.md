@@ -104,6 +104,7 @@ Prefix halaman: `/admin`.
 | `/admin/credentials` | Kelola kredensial RFID/fingerprint |
 | `/admin/approvals` | Ajukan, setujui, atau tolak persetujuan finansial sesuai peran admin |
 | `/admin/audit` | Log aktivitas untuk pemantauan |
+| `/admin/cash` | Atur tarif layanan bulanan, pantau kas, catat pengeluaran, dan buat koreksi append-only |
 
 ### Kasir
 
@@ -160,6 +161,8 @@ Pembelian dan operasi saldo dapat berdampak finansial. UI menunggu konfirmasi se
 Backend dapat meminta approval finansial untuk nominal tertentu. Jika response menyatakan approval diperlukan, ikuti alur approval yang disediakan, bukan mencoba mengirim transaksi berulang kali. Format status dan payload lengkap ada di [dokumentasi API](../backend/API_DOCUMENTATION.md).
 
 Menu **Persetujuan finansial** menyediakan tiga daftar: permintaan admin lain yang masih berlaku dan perlu ditinjau, permintaan yang dibuat admin saat ini, serta riwayat keputusan/approval kedaluwarsa. Pilih entri untuk membuka detail target, nominal, keterangan, pengaju, approver, batas waktu, dan waktu penggunaan bila sudah dikonsumsi. Tombol setujui/tolak hanya ditampilkan jika backend menyatakan `can_decide`; backend tetap memvalidasi lagi agar peminta tidak dapat menyetujui permintaannya sendiri dan permintaan kedaluwarsa tidak dapat diputuskan. Setelah disetujui, peminta masih harus mengirim transaksi yang cocok sebelum approval kedaluwarsa.
+
+Menu **Kas admin** menampilkan pemasukan biaya layanan yang benar-benar tertagih, pengeluaran operasional, saldo kas bersih, dan tunggakan bulan berjalan. Tarif berlaku untuk semua santri aktif mulai bulan berikutnya. Pengeluaran tidak dapat dihapus atau diubah; koreksi membalik nilai penuh catatan dan mempertahankan riwayat aslinya.
 
 ## 10. Tampilan responsif dan komponen
 

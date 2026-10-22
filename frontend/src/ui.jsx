@@ -173,6 +173,7 @@ const adminLinks = [
   { to: '/admin/transaksi', label: 'Transaksi', icon: ArrowLeftRight },
 ];
 const managementLinks = [
+  { to: '/admin/cash', label: 'Kas admin', icon: Banknote },
   { to: '/admin/users', label: 'Akun pengguna', icon: CircleUserRound },
   { to: '/admin/credentials', label: 'Kredensial', icon: Fingerprint },
   { to: '/admin/approvals', label: 'Persetujuan finansial', icon: ShieldCheck },
