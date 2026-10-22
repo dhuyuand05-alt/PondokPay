@@ -39,6 +39,9 @@ export function CashierHome({ token }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [payoutBusyId, setPayoutBusyId] = useState('');
+  const [payoutError, setPayoutError] = useState('');
+  const [payoutNotice, setPayoutNotice] = useState('');
   const idempotency = useRef(null);
   const field = METHOD_FIELDS[method];
   const {
@@ -55,6 +58,30 @@ export function CashierHome({ token }) {
     : '/kantin';
   const { data: historyData, refresh: refreshHistory } = useApiData(historyPath, token);
   const transactions = historyData?.data || [];
+  const { data: payoutApprovalData, refresh: refreshPayoutApprovals } = useApiData(
+    '/kantin/pencairan/persetujuan',
+    token,
+  );
+  const payoutApprovals = payoutApprovalData?.data || [];
+
+  const decidePayout = async (approvalId, decision) => {
+    setPayoutBusyId(String(approvalId));
+    setPayoutError('');
+    setPayoutNotice('');
+    try {
+      const result = await api.post(
+        `/kantin/pencairan/persetujuan/${approvalId}/${decision}`,
+        {},
+        token,
+      );
+      setPayoutNotice(result.message);
+      refreshPayoutApprovals();
+    } catch (err) {
+      setPayoutError(err.message);
+    } finally {
+      setPayoutBusyId('');
+    }
+  };
 
   const lookupStudent = async (event) => {
     event.preventDefault();
@@ -501,6 +528,82 @@ export function CashierHome({ token }) {
           </p>
         </div>
       )}
+      <section className="mt-8 rounded-2xl border border-line bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Konfirmasi pencairan kantin</h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              Permintaan untuk kantin yang ditugaskan akan muncul di sini. Konfirmasi ini
+              menggunakan sesi kasir yang sudah diverifikasi MFA.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="text-sm font-semibold text-pondok-600"
+            onClick={refreshPayoutApprovals}
+          >
+            Muat ulang
+          </button>
+        </div>
+        {payoutError && (
+          <Alert type="error" className="mt-4">
+            {payoutError}
+          </Alert>
+        )}
+        {payoutNotice && (
+          <Alert type="success" className="mt-4">
+            {payoutNotice}
+          </Alert>
+        )}
+        {payoutApprovals.length ? (
+          <div className="mt-3 divide-y divide-line">
+            {payoutApprovals.map((approval) => (
+              <div key={approval.id} className="py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold">
+                      {approval.kantin_nama} · {formatMoney(approval.amount)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Diminta oleh {approval.requester_username} ·{' '}
+                      {formatDate(approval.created_at, true)}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm">
+                      {approval.keterangan || 'Tanpa keterangan'}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Berlaku sampai {formatDate(approval.expires_at, true)}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-primary min-h-11 flex-1"
+                    disabled={Boolean(payoutBusyId)}
+                    onClick={() => decidePayout(approval.id, 'approve')}
+                  >
+                    <Check size={17} />
+                    {payoutBusyId === String(approval.id) ? 'Memproses...' : 'Konfirmasi'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-11"
+                    disabled={Boolean(payoutBusyId)}
+                    onClick={() => decidePayout(approval.id, 'reject')}
+                  >
+                    Tolak
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl bg-canvas p-3 text-sm text-muted">
+            Tidak ada permintaan pencairan yang menunggu konfirmasi.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

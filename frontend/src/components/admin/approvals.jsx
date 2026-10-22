@@ -197,6 +197,36 @@ export function AdminApprovals({ token }) {
     setDetailRevision((value) => value + 1);
   };
 
+  const executeApproved = async () => {
+    if (!approvalDetail?.can_execute) return;
+    const pathByAction = {
+      santri_topup: `/admin/santri/${approvalDetail.resource_id}/topup`,
+      santri_withdrawal: `/admin/santri/${approvalDetail.resource_id}/tarik`,
+    };
+    const path = pathByAction[approvalDetail.action];
+    if (!path) {
+      mutation.setError('Jenis transaksi pada persetujuan tidak dikenali.');
+      return;
+    }
+    const response = await mutation.run(() =>
+      api.post(
+        path,
+        {
+          jumlah: approvalDetail.amount,
+          keterangan: approvalDetail.keterangan,
+          approval_id: Number(approvalDetail.id),
+        },
+        token,
+        { idempotencyKey: `approval-${approvalDetail.id}` },
+      ),
+    );
+    if (response) {
+      setResult(response.message);
+      refreshApprovals();
+      setDetailRevision((value) => value + 1);
+    }
+  };
+
   const approvals = approvalData?.data || [];
 
   return (
@@ -491,10 +521,27 @@ export function AdminApprovals({ token }) {
                   </button>
                 </div>
               )}
-              {approvalDetail.status === 'approved' && (
+              {approvalDetail.status === 'approved' && approvalDetail.can_execute && (
+                <div className="space-y-3 border-t border-line pt-4">
+                  <Alert>
+                    Persetujuan sudah diberikan. Jalankan transaksi untuk memperbarui saldo dan
+                    mencatatnya di riwayat.
+                  </Alert>
+                  <button
+                    type="button"
+                    className="btn-primary w-full"
+                    disabled={mutation.busy}
+                    onClick={executeApproved}
+                  >
+                    {mutation.busy ? 'Memproses...' : 'Jalankan transaksi'}
+                  </button>
+                </div>
+              )}
+              {approvalDetail.status === 'approved' && !approvalDetail.can_execute && (
                 <Alert>
-                  Persetujuan menunggu peminta untuk menjalankan transaksi yang sesuai sebelum batas
-                  waktu.
+                  {approvalDetail.action === 'canteen_withdrawal'
+                    ? 'Persetujuan admin sudah diberikan. Pencairan tetap memerlukan konfirmasi kasir yang ditugaskan dan harus dijalankan dari halaman Kantin & kasir sebelum batas waktu.'
+                    : 'Persetujuan menunggu peminta untuk menjalankan transaksi yang sesuai sebelum batas waktu.'}
                 </Alert>
               )}
             </div>

@@ -28,6 +28,7 @@ export function AdminCanteens({ token }) {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [approvalId, setApprovalId] = useState('');
+  const [cashierApprovalId, setCashierApprovalId] = useState('');
   const [notice, setNotice] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,7 +45,12 @@ export function AdminCanteens({ token }) {
     selected ? `/admin/kantin/${selected.id}/transaksi?limit=5` : '/admin/kantin',
     token,
   );
+  const { data: payoutApprovalData, refresh: refreshPayoutApprovals } = useApiData(
+    selected ? `/admin/kantin/${selected.id}/pencairan/persetujuan-kasir` : '/admin/kantin',
+    token,
+  );
   const cashiers = cashierData?.data || [];
+  const payoutApprovals = payoutApprovalData?.data || [];
   const availableCashiers = (userData?.users || []).filter(
     (item) => item.role === 'kasir' && item.is_active,
   );
@@ -110,6 +116,10 @@ export function AdminCanteens({ token }) {
 
   const payout = async (event) => {
     event.preventDefault();
+    if (!cashierApprovalId) {
+      setActionError('Pencairan wajib dikonfirmasi kasir yang ditugaskan terlebih dahulu.');
+      return;
+    }
     setBusy(true);
     setActionError('');
     setNotice('');
@@ -120,6 +130,7 @@ export function AdminCanteens({ token }) {
         {
           jumlah: Number(amount),
           keterangan: description || null,
+          cashier_approval_id: Number(cashierApprovalId),
           ...(approvalId ? { approval_id: Number(approvalId) } : {}),
         },
         token,
@@ -131,14 +142,35 @@ export function AdminCanteens({ token }) {
       setAmount('');
       setDescription('');
       setApprovalId('');
+      setCashierApprovalId('');
       refresh();
       refreshHistory();
+      refreshPayoutApprovals();
     } catch (err) {
       if (err.status === 403 && err.body?.approval_required)
         setActionError(
           'Pencairan ini memerlukan persetujuan admin kedua. Buat permintaan persetujuan dahulu.',
         );
       else setActionError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const askCashierApproval = async () => {
+    setBusy(true);
+    setActionError('');
+    setNotice('');
+    try {
+      const result = await api.post(
+        `/admin/kantin/${selected.id}/pencairan/persetujuan-kasir`,
+        { jumlah: Number(amount), keterangan: description || null },
+        token,
+      );
+      setNotice(`Permintaan konfirmasi kasir #${result.data.id} berhasil dibuat.`);
+      refreshPayoutApprovals();
+    } catch (err) {
+      setActionError(err.message);
     } finally {
       setBusy(false);
     }
@@ -289,6 +321,12 @@ export function AdminCanteens({ token }) {
                     className="btn-primary mt-2 w-full"
                     onClick={() => {
                       setActionError('');
+                      setAmount('');
+                      setDescription('');
+                      setApprovalId('');
+                      setCashierApprovalId('');
+                      setNotice('');
+                      refreshPayoutApprovals();
                       setModal('payout');
                     }}
                   >
@@ -412,11 +450,20 @@ export function AdminCanteens({ token }) {
           <p className="mb-4 text-sm text-muted">
             {selected.nama} · Saldo {formatMoney(selected.saldo)}
           </p>
+          <Alert type="warning" className="mb-4">
+            Setiap pencairan harus dikonfirmasi oleh kasir yang ditugaskan melalui akun kasirnya
+            sendiri setelah login dengan MFA.
+          </Alert>
+          {notice && (
+            <Alert type="success" className="mb-4">
+              {notice}
+            </Alert>
+          )}
           <ActionForm
             onSubmit={payout}
             busy={busy}
             error={actionError}
-            submitLabel="Konfirmasi pencairan"
+            submitLabel="Jalankan pencairan"
           >
             <Field
               label="Nominal"
@@ -424,19 +471,98 @@ export function AdminCanteens({ token }) {
               min="0.01"
               step="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setCashierApprovalId('');
+              }}
               required
             />
             <TextAreaField
               label="Keterangan"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setCashierApprovalId('');
+              }}
+              maxLength={1000}
             />
             <Field
-              label="ID approval (jika diperlukan)"
+              label="ID persetujuan admin kedua (untuk jumlah besar)"
               value={approvalId}
               onChange={(e) => setApprovalId(e.target.value)}
             />
+            <div className="space-y-3 rounded-xl border border-line p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">Konfirmasi kasir</p>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-pondok-600"
+                  onClick={refreshPayoutApprovals}
+                >
+                  Muat ulang
+                </button>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary w-full"
+                onClick={askCashierApproval}
+                disabled={busy || !amount}
+              >
+                Minta konfirmasi kasir
+              </button>
+              {payoutApprovals
+                .filter(
+                  (item) =>
+                    Number(item.amount).toFixed(2) === Number(amount || 0).toFixed(2) &&
+                    (item.keterangan ?? '') === (description || ''),
+                )
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 rounded-lg bg-canvas p-3 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">Permintaan #{item.id}</p>
+                      <p className="text-xs text-muted">
+                        {item.cashier_username
+                          ? `Dikonfirmasi oleh ${item.cashier_username}`
+                          : 'Menunggu kasir'}
+                      </p>
+                    </div>
+                    <StatusBadge
+                      tone={
+                        item.status === 'approved'
+                          ? 'green'
+                          : item.status === 'pending'
+                            ? 'amber'
+                            : 'gray'
+                      }
+                    >
+                      {{
+                        pending: 'Menunggu',
+                        approved: 'Disetujui',
+                        rejected: 'Ditolak',
+                        consumed: 'Digunakan',
+                        expired: 'Kedaluwarsa',
+                      }[item.status] || item.status}
+                    </StatusBadge>
+                    {item.status === 'approved' && (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-pondok-600"
+                        onClick={() => setCashierApprovalId(String(item.id))}
+                      >
+                        {cashierApprovalId === String(item.id) ? 'Dipilih' : 'Pilih'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              {cashierApprovalId && (
+                <p className="text-xs font-medium text-pondok-700">
+                  Persetujuan kasir #{cashierApprovalId} dipilih.
+                </p>
+              )}
+            </div>
           </ActionForm>
           {actionError.includes('memerlukan persetujuan') && (
             <button

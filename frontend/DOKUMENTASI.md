@@ -111,7 +111,7 @@ Prefix halaman: `/kasir`.
 
 | Route | Halaman |
 |---|---|
-| `/kasir` | Pilih kantin yang ditugaskan, cari/verifikasi santri, masukkan nominal, konfirmasi pembelian, dan lihat hasil transaksi |
+| `/kasir` | Pilih kantin yang ditugaskan, cari/verifikasi santri, konfirmasi pembelian, dan setujui/tolak permintaan pencairan melalui sesi MFA kasir |
 | `/kasir/history` | Riwayat transaksi kantin |
 | `/kasir/account` | Profil, kantin yang ditugaskan, informasi keamanan akun, dan keluar |
 

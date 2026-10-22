@@ -108,10 +108,34 @@ CREATE TABLE IF NOT EXISTS kantin_kasir (
         REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS canteen_payout_approvals (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    kantin_id INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    keterangan TEXT DEFAULT NULL,
+    requester_id INT NOT NULL,
+    cashier_id INT DEFAULT NULL,
+    status ENUM('pending', 'approved', 'rejected', 'consumed')
+        NOT NULL DEFAULT 'pending',
+    expires_at TIMESTAMP NOT NULL,
+    decided_at TIMESTAMP DEFAULT NULL,
+    consumed_at TIMESTAMP DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_canteen_payout_pending (status, expires_at),
+    INDEX idx_canteen_payout_requester (requester_id, created_at),
+    CONSTRAINT fk_canteen_payout_kantin FOREIGN KEY (kantin_id)
+        REFERENCES kantin(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_payout_requester FOREIGN KEY (requester_id)
+        REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_payout_cashier FOREIGN KEY (cashier_id)
+        REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
 DROP TRIGGER IF EXISTS trg_transaksi_no_update;
 DROP TRIGGER IF EXISTS trg_transaksi_no_delete;
 DROP TRIGGER IF EXISTS trg_kantin_transaksi_no_update;
 DROP TRIGGER IF EXISTS trg_kantin_transaksi_no_delete;
+DROP TRIGGER IF EXISTS trg_canteen_payout_approval_protect_update;
 
 DELIMITER $$
 
@@ -145,6 +169,36 @@ FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Financial ledger rows are append-only';
+END$$
+
+CREATE TRIGGER trg_canteen_payout_approval_protect_update
+BEFORE UPDATE ON canteen_payout_approvals
+FOR EACH ROW
+BEGIN
+    IF NOT (NEW.kantin_id <=> OLD.kantin_id)
+        OR NOT (NEW.amount <=> OLD.amount)
+        OR NOT (NEW.keterangan <=> OLD.keterangan)
+        OR NOT (NEW.requester_id <=> OLD.requester_id)
+        OR NOT (NEW.expires_at <=> OLD.expires_at)
+        OR NOT (NEW.created_at <=> OLD.created_at)
+        OR NOT (
+            (
+                OLD.status = 'pending' AND NEW.status IN ('approved', 'rejected')
+                AND OLD.cashier_id IS NULL AND NEW.cashier_id IS NOT NULL
+                AND OLD.decided_at IS NULL AND NEW.decided_at IS NOT NULL
+                AND NEW.consumed_at IS NULL
+            )
+            OR (
+                OLD.status = 'approved' AND NEW.status = 'consumed'
+                AND OLD.cashier_id <=> NEW.cashier_id
+                AND OLD.decided_at <=> NEW.decided_at
+                AND OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL
+            )
+        )
+    THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Canteen payout approval data is immutable';
+    END IF;
 END$$
 
 DELIMITER ;

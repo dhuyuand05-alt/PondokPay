@@ -178,7 +178,7 @@ sudo mysql < sql/install.sql
 sudo mysql db_cashless_santri -e "SHOW TABLES;"
 ```
 
-Tabel utama yang dibuat adalah `users`, `santri`, `kantin`, `credentials_auth`, `transaksi`, `kantin_transaksi`, `kantin_kasir`, `wali_santri`, `audit_logs`, `financial_approvals`, dan `security_rate_limits`.
+Tabel utama yang dibuat adalah `users`, `santri`, `kantin`, `credentials_auth`, `transaksi`, `kantin_transaksi`, `kantin_kasir`, `canteen_payout_approvals`, `wali_santri`, `audit_logs`, `financial_approvals`, dan `security_rate_limits`.
 
 Skrip menggunakan `CREATE TABLE IF NOT EXISTS` untuk tabel; trigger dengan nama yang sama akan dibuat ulang. Skrip bukan alat upgrade penuh untuk tabel lama yang memiliki kolom berbeda dan tidak menghapus data. Untuk schema lama, buat backup terlebih dahulu lalu jalankan migrasi aplikasi secara terkontrol.
 
@@ -455,7 +455,7 @@ Lakukan pemeriksaan berikut:
 2. Endpoint `https://pondokpay.example.id/api/...` hanya dapat diakses melalui API dan responsnya sesuai.
 3. Port publik yang dibuka hanya SSH, HTTP, dan HTTPS; MySQL dan Node tidak dapat diakses dari internet.
 4. Admin dapat login dan menyelesaikan MFA melalui HTTPS; buat dan uji login kasir serta wali di staging.
-5. Dua admin berbeda dapat mengajukan dan memutuskan approval; transaksi membutuhkan approval yang cocok jika di atas ambang.
+5. Uji permintaan pencairan kantin: admin mengajukan, kasir aktif yang ditugaskan mengonfirmasi dari sesi MFA miliknya, lalu admin menjalankan pencairan; jumlah/keterangan yang berbeda atau approval yang dipakai ulang harus ditolak. Uji pula persetujuan admin kedua untuk jumlah di atas ambang.
 6. Lakukan transaksi staging dan periksa saldo, ledger, audit, dan perilaku retry `Idempotency-Key`.
 7. Jalankan backup terenkripsi, kemudian restore ke database staging kosong dan verifikasi rekonsiliasi. Jangan menguji restore di database production.
 8. Uji pemulihan VPS dan database dari backup sesuai target waktu pemulihan organisasi.

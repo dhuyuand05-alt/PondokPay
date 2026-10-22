@@ -15,7 +15,7 @@ Dokumen ini merangkum endpoint yang saat ini tersedia di backend untuk membantu 
 - Password baru minimal 12 byte dan maksimal 72 byte. Password disimpan dalam bentuk hash, tidak pernah dikembalikan oleh API.
 - Access token berlaku 1 jam; challenge MFA berlaku 5 menit. Tidak ada endpoint logout khusus; perubahan password, role, atau status akun mencabut sesi aktif.
 - Endpoint daftar yang mendukung pagination menggunakan `?page=1&limit=20`. Nilai default `page=1`, `limit=20`; limit maksimum 100.
-- JSON error umum berbentuk `{"message":"..."}`. Error autentikasi/validasi tertentu juga mengembalikan `approval_required`.
+- JSON error umum berbentuk `{"message":"..."}`. Error autentikasi/validasi tertentu juga mengembalikan `approval_required` atau `cashier_approval_required`.
 
 ## Autentikasi, sesi, dan MFA
 
@@ -304,6 +304,8 @@ Fingerprint response memakai `fingerprint_id` alih-alih `rfid_uid`. Nilai ini ha
 | POST | `/api/admin/kantin/:id/kasir` | Tugaskan kasir: `{ "user_id": 12 }` |
 | DELETE | `/api/admin/kantin/:id/kasir/:userId` | Cabut penugasan kasir |
 | POST | `/api/admin/kantin/:id/penjualan` | Catat penjualan untuk santri |
+| GET | `/api/admin/kantin/:id/pencairan/persetujuan-kasir` | Status konfirmasi kasir untuk permintaan admin |
+| POST | `/api/admin/kantin/:id/pencairan/persetujuan-kasir` | Minta konfirmasi kasir: `{ "jumlah": 10000, "keterangan": "..." }` |
 | POST | `/api/admin/kantin/:id/pencairan` | Cairkan saldo kantin |
 | GET | `/api/admin/kantin/:id/transaksi` | Riwayat penjualan/pencairan |
 
@@ -311,7 +313,7 @@ Objek kantin: `id`, `nama`, `lokasi`, `status` (`active`/`inactive`), `saldo`, `
 
 Kasir terdaftar dalam daftar dengan `{ "id": 12, "username": "kasir_1", "created_at": "..." }`. Penugasan berhasil merespons `{ "message": "...", "data": { "kantin_id": 4, "user_id": 12 } }`.
 
-Penjualan admin memakai body `{ "santri_id": 10, "jumlah": 12000, "keterangan": "Belanja" }`; pencairan memakai `{ "jumlah": 10000, "keterangan": "Pencairan hasil penjualan", "approval_id": 21 }`. Keduanya memerlukan `Idempotency-Key`.
+Penjualan admin memakai body `{ "santri_id": 10, "jumlah": 12000, "keterangan": "Belanja" }`. Setiap pencairan wajib diajukan oleh admin melalui endpoint persetujuan kasir. Kasir aktif yang ditugaskan mengonfirmasi dari sesi kasirnya sendiri; login kasir mewajibkan MFA. Setelah status konfirmasi `approved`, admin peminta menjalankan pencairan dengan `{ "jumlah": 10000, "keterangan": "Pencairan hasil penjualan", "cashier_approval_id": 21 }`. Jumlah dan keterangan harus sama persis dengan permintaan. Pencairan di atas ambang juga tetap memerlukan `approval_id` persetujuan admin kedua. Keduanya memerlukan `Idempotency-Key`.
 
 ```json
 {
@@ -324,7 +326,7 @@ Penjualan admin memakai body `{ "santri_id": 10, "jumlah": 12000, "keterangan": 
 }
 ```
 
-Penjualan ditolak dengan `409` bila saldo santri tidak cukup, limit harian terlampaui, kantin tidak aktif, atau key dipakai untuk payload lain. Pencairan mengembalikan `id`, `kantin_id`, `tipe_transaksi: "pencairan"`, `jumlah`, `saldo_akhir`, `keterangan`; saldo kantin tidak cukup menghasilkan `409`. Transaksi baru `201`, retry identik `200` dengan `duplicate: true`.
+Permintaan konfirmasi kasir berlaku 24 jam dan hanya dapat diputuskan sekali oleh kasir aktif yang ditugaskan. Kasir hanya dapat melihat permintaan untuk kantin yang menjadi tugasnya. Persetujuan diikat ke admin peminta, kantin, jumlah, dan keterangan; persetujuan terpakai atau kedaluwarsa tidak dapat digunakan lagi. Penjualan ditolak dengan `409` bila saldo santri tidak cukup, limit harian terlampaui, kantin tidak aktif, atau key dipakai untuk payload lain. Pencairan mengembalikan `id`, `kantin_id`, `tipe_transaksi: "pencairan"`, `jumlah`, `saldo_akhir`, `keterangan`; konfirmasi kasir wajib dan saldo kantin tidak cukup menghasilkan `409`. Transaksi baru `201`, retry identik `200` dengan `duplicate: true`.
 
 ### Transaksi
 
@@ -407,6 +409,9 @@ Semua endpoint `/api/kantin` memerlukan token role `kasir` dengan MFA aktif. Aks
 | GET | `/api/kantin` | Kantin aktif yang ditugaskan |
 | GET | `/api/kantin/:id` | Detail dan saldo |
 | GET | `/api/kantin/:id/saldo` | Detail dan saldo (alias) |
+| GET | `/api/kantin/pencairan/persetujuan` | Permintaan pencairan untuk kantin yang ditugaskan |
+| POST | `/api/kantin/pencairan/persetujuan/:id/approve` | Konfirmasi pencairan |
+| POST | `/api/kantin/pencairan/persetujuan/:id/reject` | Tolak permintaan pencairan |
 | POST | `/api/kantin/:id/santri/lookup` | Cari santri |
 | POST | `/api/kantin/:id/penjualan` | Catat transaksi belanja |
 | GET | `/api/kantin/:id/transaksi` | Riwayat kantin |

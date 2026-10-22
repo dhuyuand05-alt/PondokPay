@@ -9,6 +9,11 @@ import { createCanteenSale } from '../controllers/adminController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import { requireAssignedCanteen } from '../middleware/canteenAccess.js';
 import { auditMutation } from '../middleware/security.js';
+import {
+  approveCanteenPayout,
+  getCanteenPayoutApprovalsForCashier,
+  rejectCanteenPayout,
+} from '../services/canteenPayoutApprovals.js';
 
 const router = express.Router();
 
@@ -16,6 +21,9 @@ router.use(authenticateToken, authorizeRoles('kasir'));
 router.use(auditMutation);
 
 router.get('/', getAssignedCanteens);
+router.get('/pencairan/persetujuan', getCanteenPayoutApprovalsForCashier);
+router.post('/pencairan/persetujuan/:id/approve', approveCanteenPayout);
+router.post('/pencairan/persetujuan/:id/reject', rejectCanteenPayout);
 router.post('/:id/santri/lookup', requireAssignedCanteen, lookupStudent);
 router.get('/:id', requireAssignedCanteen, getAssignedCanteen);
 router.get('/:id/saldo', requireAssignedCanteen, getAssignedCanteen);

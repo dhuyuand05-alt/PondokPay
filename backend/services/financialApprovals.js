@@ -22,7 +22,7 @@ const approvalStatuses = new Set(['pending', 'approved', 'rejected', 'consumed',
 const approvalSelect = `
   SELECT fa.id, fa.action, fa.resource_id, fa.amount, fa.keterangan,
          CASE
-           WHEN fa.status = 'pending' AND fa.expires_at <= CURRENT_TIMESTAMP THEN 'expired'
+           WHEN fa.status IN ('pending', 'approved') AND fa.expires_at <= CURRENT_TIMESTAMP THEN 'expired'
            ELSE fa.status
          END AS status,
          fa.requester_id, requester.username AS requester_username,
@@ -34,7 +34,10 @@ const approvalSelect = `
          END AS resource_detail,
          fa.created_at, fa.expires_at, fa.decided_at, fa.consumed_at,
          (fa.status = 'pending' AND fa.expires_at > CURRENT_TIMESTAMP
-           AND fa.requester_id <> ?) AS can_decide
+           AND fa.requester_id <> ?) AS can_decide,
+         (fa.status = 'approved' AND fa.action <> 'canteen_withdrawal'
+           AND fa.expires_at > CURRENT_TIMESTAMP
+           AND fa.requester_id = ?) AS can_execute
   FROM financial_approvals fa
   JOIN users requester ON requester.id = fa.requester_id
   LEFT JOIN users approver ON approver.id = fa.approver_id
@@ -77,7 +80,7 @@ const approvalFilter = (req) => {
   }
 
   if (status === 'expired') {
-    conditions.push(`fa.status = 'pending' AND fa.expires_at <= CURRENT_TIMESTAMP`);
+    conditions.push(`fa.status IN ('pending', 'approved') AND fa.expires_at <= CURRENT_TIMESTAMP`);
   } else if (status === 'pending') {
     conditions.push(`fa.status = 'pending' AND fa.expires_at > CURRENT_TIMESTAMP`);
   } else if (status) {
@@ -104,10 +107,14 @@ export const getFinancialApprovals = async (req, res) => {
       `${approvalSelect} ${filter.where}
        ORDER BY fa.created_at DESC, fa.id DESC
        LIMIT ? OFFSET ?`,
-      [req.user.id, ...filter.values, limit, offset]
+      [req.user.id, req.user.id, ...filter.values, limit, offset]
     );
     return res.status(200).json({
-      data: rows.map((row) => ({ ...row, can_decide: Boolean(row.can_decide) })),
+      data: rows.map((row) => ({
+        ...row,
+        can_decide: Boolean(row.can_decide),
+        can_execute: Boolean(row.can_execute),
+      })),
       pagination: { page, limit, total: count.total },
     });
   } catch (error) {
@@ -122,13 +129,17 @@ export const getFinancialApprovalById = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `${approvalSelect} WHERE fa.id = ? LIMIT 1`,
-      [req.user.id, approvalId]
+      [req.user.id, req.user.id, approvalId]
     );
     if (!rows.length) {
       return res.status(404).json({ message: 'Permintaan persetujuan tidak ditemukan.' });
     }
     return res.status(200).json({
-      data: { ...rows[0], can_decide: Boolean(rows[0].can_decide) },
+      data: {
+        ...rows[0],
+        can_decide: Boolean(rows[0].can_decide),
+        can_execute: Boolean(rows[0].can_execute),
+      },
     });
   } catch (error) {
     console.error('Get financial approval detail error:', error);

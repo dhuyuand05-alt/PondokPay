@@ -50,6 +50,10 @@ import {
   rejectFinancialApproval,
   requestFinancialApproval,
 } from '../services/financialApprovals.js';
+import {
+  getCanteenPayoutApprovalsForAdmin,
+  requestCanteenPayoutApproval,
+} from '../services/canteenPayoutApprovals.js';
 
 const router = express.Router();
 
@@ -85,6 +89,8 @@ router.get('/kantin/:id/kasir', getCanteenCashiers);
 router.post('/kantin/:id/kasir', assignCanteenCashier);
 router.delete('/kantin/:id/kasir/:userId', removeCanteenCashier);
 router.post('/kantin/:id/penjualan', createCanteenSale);
+router.get('/kantin/:id/pencairan/persetujuan-kasir', getCanteenPayoutApprovalsForAdmin);
+router.post('/kantin/:id/pencairan/persetujuan-kasir', requestCanteenPayoutApproval);
 router.post('/kantin/:id/pencairan', createCanteenWithdrawal);
 router.get('/kantin/:id/transaksi', getCanteenTransactions);
 

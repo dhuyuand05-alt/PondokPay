@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import pool from '../config/db.js';
 import { validatePassword } from '../config/passwords.js';
+import { consumeCanteenPayoutApproval } from '../services/canteenPayoutApprovals.js';
 import { consumeFinancialApproval } from '../services/financialApprovals.js';
 
 const validCredentialStatuses = ['active', 'blocked'];
@@ -1050,6 +1051,9 @@ export const createCanteenWithdrawal = async (req, res) => {
           duplicate: true,
         };
       }
+      await consumeCanteenPayoutApproval(
+        connection, req, kantinId, amount.value, keterangan
+      );
       await consumeFinancialApproval(
         connection, req, 'canteen_withdrawal', kantinId, amount.value, keterangan
       );
@@ -1118,6 +1122,12 @@ export const createCanteenWithdrawal = async (req, res) => {
     }
     if (error.code === 'FINANCIAL_APPROVAL_INVALID') {
       return res.status(409).json({ message: 'Persetujuan pencairan tidak cocok atau sudah digunakan.' });
+    }
+    if (error.code === 'CANTEEN_CASHIER_APPROVAL_REQUIRED') {
+      return res.status(403).json({ message: error.message, cashier_approval_required: true });
+    }
+    if (error.code === 'CANTEEN_CASHIER_APPROVAL_INVALID') {
+      return res.status(409).json({ message: error.message });
     }
     if (error.code === 'INSUFFICIENT_CANTEEN_BALANCE') {
       return res.status(409).json({ message: 'Saldo kantin tidak mencukupi untuk pencairan ini.' });

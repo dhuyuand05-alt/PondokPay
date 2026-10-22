@@ -154,7 +154,7 @@ Sertakan access token pada header autentikasi HTTP dengan skema Bearer. Login ad
 
 Transaksi finansial wajib memakai header `Idempotency-Key` sesuai ketentuan endpoint. Retry yang belum diketahui hasilnya harus memakai key dan payload yang sama. Key sama dengan payload berbeda menghasilkan konflik, bukan transaksi kedua.
 
-Nominal tertentu untuk top-up santri, penarikan santri, dan pencairan kantin memerlukan persetujuan admin kedua. Approval harus sesuai tindakan, target, nominal, dan keterangan, hanya berlaku 24 jam, dan hanya dapat dikonsumsi sekali. Lihat detail alurnya di API dan panduan operasi keamanan.
+Setiap pencairan saldo kantin memerlukan konfirmasi kasir aktif yang ditugaskan, dari sesi kasir yang login dengan MFA. Konfirmasi terikat ke admin peminta, kantin, nominal, dan keterangan, berlaku 24 jam, serta hanya dapat digunakan sekali. Pencairan di atas ambang tetap memerlukan persetujuan admin kedua. Lihat alur endpoint di dokumentasi API.
 
 ## 8. Aturan keamanan penting
 
