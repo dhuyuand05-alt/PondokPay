@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {
   createWhatsAppChallenge,
   getDirectWhatsAppSenderJid,
@@ -7,7 +10,10 @@ import {
   normalizeWhatsAppNumber,
   parseWhatsAppVerificationCode,
 } from '../services/whatsapp.js';
-import { getWhatsAppSessionStatus } from '../services/whatsappBot.js';
+import {
+  clearWhatsAppAuthDirectoryContents,
+  getWhatsAppSessionStatus,
+} from '../services/whatsappBot.js';
 
 test('WhatsApp numbers are normalized to international digits', () => {
   assert.equal(normalizeWhatsAppNumber('0812 3456-7890'), '6281234567890');
@@ -29,6 +35,21 @@ test('WhatsApp connection status does not expose session credentials', () => {
   const status = getWhatsAppSessionStatus();
   assert.equal(status.status, 'disconnected');
   assert.deepEqual(Object.keys(status).sort(), ['error', 'phone', 'qr_data_url', 'status']);
+});
+
+test('clearing a WhatsApp session removes its contents but preserves the writable directory', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pondokpay-whatsapp-'));
+  const authDirectory = path.join(root, 'whatsapp-auth');
+  await mkdir(path.join(authDirectory, 'nested'), { recursive: true });
+  await writeFile(path.join(authDirectory, 'creds.json'), '{}');
+  await writeFile(path.join(authDirectory, 'nested', 'session.json'), '{}');
+
+  try {
+    await clearWhatsAppAuthDirectoryContents(authDirectory);
+    assert.deepEqual(await readdir(authDirectory), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('WhatsApp verification code parser accepts the sent format and rejects unrelated messages', () => {

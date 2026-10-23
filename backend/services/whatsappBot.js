@@ -14,6 +14,20 @@ import {
   parseWhatsAppVerificationCode,
 } from './whatsapp.js';
 
+export const clearWhatsAppAuthDirectoryContents = async (directory) => {
+  let entries;
+  try {
+    entries = await readdir(directory);
+  } catch (error) {
+    if (error.code === 'ENOENT') return;
+    throw error;
+  }
+
+  for (const entry of entries) {
+    await rm(path.join(directory, entry), { recursive: true, force: true });
+  }
+};
+
 const backendDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const authDirectory = path.resolve(
   process.env.WHATSAPP_AUTH_DIR || path.join(backendDirectory, 'whatsapp-auth'),
@@ -48,7 +62,7 @@ const prepareAuthDirectory = async () => {
 
 const clearAuthDirectory = async () => {
   validateAuthDirectory();
-  await rm(authDirectory, { recursive: true, force: true });
+  await clearWhatsAppAuthDirectoryContents(authDirectory);
 };
 
 const updateStatus = (updates) => Object.assign(state, updates);
@@ -148,7 +162,11 @@ export const connectWhatsAppSession = async () => {
     activeSocket.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
       if (socket !== activeSocket) return;
       if (qr) {
-        QRCode.toDataURL(qr).then((qrDataUrl) => {
+        QRCode.toDataURL(qr, {
+          width: 512,
+          margin: 4,
+          errorCorrectionLevel: 'M',
+        }).then((qrDataUrl) => {
           if (socket === activeSocket) {
             updateStatus({ status: 'qr', qr_data_url: qrDataUrl, error: null });
           }

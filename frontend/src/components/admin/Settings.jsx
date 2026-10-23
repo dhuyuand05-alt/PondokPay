@@ -421,7 +421,7 @@ export function AdminSettings({ token, onUpdate }) {
           {whatsapp.error && <Alert type="error">{whatsapp.error}</Alert>}
           {whatsapp.qr_data_url && (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-white p-5">
-              <img className="h-64 w-64" src={whatsapp.qr_data_url} alt="QR untuk menghubungkan WhatsApp" />
+              <img className="h-72 w-72 max-w-full object-contain" src={whatsapp.qr_data_url} alt="QR untuk menghubungkan WhatsApp" />
               <p className="text-center text-sm text-muted">WhatsApp di ponsel → Perangkat tertaut → Tautkan perangkat. QR diperbarui otomatis; pindai sebelum kedaluwarsa.</p>
             </div>
           )}

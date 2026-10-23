@@ -410,7 +410,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/backups/pondokpay
+ReadWritePaths=/var/backups/pondokpay /var/lib/pondokpay/uploads /var/lib/pondokpay/whatsapp-auth
 
 [Install]
 WantedBy=multi-user.target
@@ -421,6 +421,8 @@ Buat direktori backup sebelum menjalankan service dan berikan akses ke akun serv
 
 ```bash
 install -d -o pondokpay -g pondokpay -m 750 /var/backups/pondokpay
+install -d -o pondokpay -g pondokpay -m 750 /var/lib/pondokpay/uploads
+install -d -o pondokpay -g pondokpay -m 700 /var/lib/pondokpay/whatsapp-auth
 systemctl daemon-reload
 systemctl enable --now pondokpay
 systemctl status pondokpay --no-pager
