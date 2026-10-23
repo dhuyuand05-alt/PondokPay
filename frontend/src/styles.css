@@ -33,6 +33,31 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 ::selection { color: white; background: #078264; }
 
+@keyframes landing-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes landing-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.landing-enter { animation: landing-enter 650ms both; }
+.landing-enter-later { animation-delay: 140ms; }
+.landing-float { animation: landing-float 4.5s ease-in-out infinite; }
+.landing-float-delayed { animation-delay: 1.2s; }
+.landing-icon { animation: landing-float 4.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer components {
   .card { @apply rounded-2xl border border-line bg-white shadow-soft; }
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition; }

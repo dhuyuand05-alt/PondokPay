@@ -33,6 +33,7 @@ When hosting frontend and API on different origins, set `VITE_API_BASE_URL` to t
 
 ## Included screens
 
+- Public landing page at `/` introduces PondokPay, `/dokumentasi` provides a feature guide for users, and `/login` contains the sign-in form.
 - Admin: dashboard, santri, saldo operations, admin cash/service fees, credentials, canteens/cashiers, parent accounts, transactions, users, financial approvals, and audit log.
 - Cashier: assigned canteen selection, purchase amount entry, student verification by RFID/fingerprint ID, payment confirmation, account, and canteen history.
 - Parent/guardian: linked children, balance and daily-limit overview, transaction history, and daily-limit updates.

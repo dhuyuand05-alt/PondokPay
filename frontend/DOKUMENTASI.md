@@ -6,6 +6,8 @@ Dokumen ini menjelaskan aplikasi web PondokPay: cara menjalankan dan membangunny
 
 Frontend adalah aplikasi single-page berbasis React 18, React Router, Vite, Tailwind CSS, dan `lucide-react`. Aplikasi menyediakan portal admin, kasir, serta wali. Seluruh data dan validasi otoritatif berasal dari backend; UI tidak menggantikan autentikasi, otorisasi, ataupun aturan finansial server.
 
+Pengunjung tanpa sesi melihat halaman pengenalan PondokPay di `/`. Dokumentasi fitur untuk pengguna tersedia di `/dokumentasi`, sedangkan formulir autentikasi ada di `/login`; pengguna yang sudah masuk tetap diarahkan ke dashboard sesuai perannya.
+
 Peran yang memiliki antarmuka saat ini:
 
 - **Admin:** dashboard dan pengelolaan data serta operasi pondok.
@@ -65,7 +67,7 @@ Jika frontend dan API berada pada origin berbeda, origin frontend harus diizinka
 | Lokasi | Tanggung jawab |
 |---|---|
 | `src/main.jsx` | Mount React, router browser, dan stylesheet |
-| `src/App.jsx` | Login, enrollment/verifikasi MFA, pemulihan sesi, dan route berdasar role |
+| `src/App.jsx` | Beranda publik, login, enrollment/verifikasi MFA, pemulihan sesi, dan route berdasar role |
 | `src/api.js` | Klien `fetch`, header bearer/idempotensi, parsing response, dan `ApiError` |
 | `src/hooks.js` | Hook UI bersama |
 | `src/ui.jsx` | Layout, komponen UI, navigasi, dan elemen tampilan umum |
@@ -80,9 +82,13 @@ Komponen peran diekspor melalui file `index.js` masing-masing direktori. Helper 
 
 ## 6. Halaman dan alur peran
 
+### Beranda publik
+
+Route `/` menampilkan halaman pengenalan PondokPay yang responsif, berisi ringkasan kemampuan, jenis pengguna, dan informasi keamanan. Nama serta logo pondok mengikuti pengaturan publik dari backend. Tautan **Dokumentasi lengkap** membuka `/dokumentasi`, yaitu artikel fitur untuk admin, kasir, dan wali—bukan panduan instalasi. Tombol masuk mengarah ke `/login`; route publik tak dikenal diarahkan kembali ke `/`.
+
 ### Login dan MFA
 
-Halaman masuk menerima username dan password. Login wali mendapat token akses langsung bila kredensial valid. Untuk admin dan kasir, backend mengembalikan challenge MFA; frontend kemudian menampilkan salah satu alur:
+Halaman `/login` menerima username dan password, dengan tautan kembali ke beranda. Login wali mendapat token akses langsung bila kredensial valid. Untuk admin dan kasir, backend mengembalikan challenge MFA; frontend kemudian menampilkan salah satu alur:
 
 1. Enrollment pertama: meminta backend membuat provisioning URI dan secret untuk authenticator.
 2. Login biasa: pengguna memasukkan kode TOTP enam digit dari authenticator.
