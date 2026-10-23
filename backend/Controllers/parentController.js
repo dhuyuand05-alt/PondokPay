@@ -1,4 +1,10 @@
 import pool from '../config/db.js';
+import {
+  createWhatsAppChallenge,
+  hashVerificationCode,
+  normalizeWhatsAppNumber,
+} from '../services/whatsapp.js';
+import { getWhatsAppSessionStatus } from '../services/whatsappBot.js';
 
 const parseId = (value) => {
   const id = Number(value);
@@ -54,6 +60,99 @@ export const getParentProfile = async (req, res) => {
   } catch (error) {
     console.error('Get parent profile error:', error);
     return res.status(500).json({ message: 'Gagal mengambil profil orang tua.' });
+  }
+};
+
+export const getParentWhatsAppSettings = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT whatsapp_number, verified_at, verification_expires_at
+       FROM parent_notification_settings WHERE user_id = ?`,
+      [req.user.id]
+    );
+    return res.status(200).json({
+      data: rows[0] || { whatsapp_number: '', verified_at: null, verification_expires_at: null },
+    });
+  } catch (error) {
+    console.error('Get parent WhatsApp settings error:', error);
+    return res.status(500).json({ message: 'Gagal mengambil pengaturan notifikasi WhatsApp.' });
+  }
+};
+
+export const requestParentWhatsAppVerification = async (req, res) => {
+  const phone = normalizeWhatsAppNumber(req.body.phone);
+  if (!phone) {
+    return res.status(400).json({ message: 'Masukkan nomor WhatsApp yang valid, misalnya 081234567890.' });
+  }
+
+  try {
+    const [[child]] = await pool.query(
+      'SELECT santri_id FROM wali_santri WHERE user_id = ? LIMIT 1',
+      [req.user.id]
+    );
+    if (!child) return res.status(409).json({ message: 'Hubungi admin untuk menghubungkan akun dengan data anak terlebih dahulu.' });
+
+    const whatsappStatus = getWhatsAppSessionStatus();
+    if (whatsappStatus.status !== 'connected' || !whatsappStatus.phone) {
+      return res.status(503).json({ message: 'WhatsApp pondok belum terhubung. Hubungi admin pondok.' });
+    }
+    const [[previousChallenge]] = await pool.query(
+      `SELECT verification_code_hash,
+              updated_at > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 60 SECOND) AS rate_limited
+       FROM parent_notification_settings WHERE user_id = ?`,
+      [req.user.id]
+    );
+    if (previousChallenge?.verification_code_hash && previousChallenge.rate_limited) {
+      return res.status(429).json({ message: 'Tunggu satu menit sebelum meminta kode verifikasi baru.' });
+    }
+    const botNumber = whatsappStatus.phone;
+    const challenge = createWhatsAppChallenge();
+    await pool.query(
+      `UPDATE whatsapp_notification_outbox
+       SET status = 'failed', processing_at = NULL,
+           last_error = 'Wali memperbarui verifikasi nomor WhatsApp.'
+       WHERE user_id = ? AND status = 'pending'`,
+      [req.user.id]
+    );
+    await pool.query(
+      `INSERT INTO parent_notification_settings
+         (user_id, whatsapp_number, verification_code_hash, verification_expires_at, verified_at)
+       VALUES (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 10 MINUTE), NULL)
+       ON DUPLICATE KEY UPDATE
+         whatsapp_number = VALUES(whatsapp_number),
+         verification_code_hash = VALUES(verification_code_hash),
+         verification_expires_at = VALUES(verification_expires_at),
+         verified_at = NULL`,
+      [req.user.id, phone, hashVerificationCode(challenge)]
+    );
+    const message = `PONDOKPAY VERIFIKASI ${challenge}`;
+    return res.status(200).json({
+      message: 'Kirim pesan WhatsApp yang sudah disiapkan untuk memverifikasi nomor. PondokPay tidak mengirim pesan sebelum Anda memulainya.',
+      data: {
+        whatsapp_number: phone,
+        whatsapp_link: `https://wa.me/${botNumber}?text=${encodeURIComponent(message)}`,
+        expires_in_seconds: 600,
+      },
+    });
+  } catch (error) {
+    console.error('Request parent WhatsApp verification error:', error);
+    return res.status(503).json({ message: error.message || 'Gagal menyiapkan verifikasi WhatsApp. Coba lagi nanti.' });
+  }
+};
+
+export const disableParentWhatsAppNotifications = async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM parent_notification_settings WHERE user_id = ?',
+      [req.user.id]
+    );
+    return res.status(200).json({
+      message: 'Notifikasi WhatsApp dinonaktifkan dan nomor terhapus dari akun.',
+      data: { whatsapp_number: '', verified_at: null, verification_expires_at: null },
+    });
+  } catch (error) {
+    console.error('Disable parent WhatsApp notifications error:', error);
+    return res.status(500).json({ message: 'Gagal menonaktifkan notifikasi WhatsApp.' });
   }
 };
 

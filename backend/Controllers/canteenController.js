@@ -17,7 +17,7 @@ const parsePagination = (query) => {
 export const getAssignedCanteens = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT k.id, k.nama, k.lokasi, k.status, k.saldo
+      `SELECT k.id, k.nama, k.lokasi, k.status, k.saldo, k.catalog_enabled
        FROM kantin k
        JOIN kantin_kasir kk ON kk.kantin_id = k.id
        WHERE kk.user_id = ? AND k.status = 'active'
@@ -36,7 +36,7 @@ export const getAssignedCanteen = async (req, res) => {
   if (!canteenId) return res.status(400).json({ message: 'ID kantin tidak valid.' });
   try {
     const [rows] = await pool.query(
-      `SELECT k.id, k.nama, k.lokasi, k.status, k.saldo
+      `SELECT k.id, k.nama, k.lokasi, k.status, k.saldo, k.catalog_enabled
        FROM kantin k
        JOIN kantin_kasir kk ON kk.kantin_id = k.id
        WHERE kk.user_id = ? AND k.id = ?
@@ -143,6 +143,25 @@ export const getCanteenTransactions = async (req, res) => {
        ORDER BY kt.created_at DESC, kt.id DESC LIMIT ? OFFSET ?`,
       [...values, limit, offset]
     );
+    const transactionIds = rows
+      .map((row) => row.transaksi_id)
+      .filter((transactionId) => transactionId !== null);
+    if (transactionIds.length) {
+      const [items] = await pool.query(
+        `SELECT transaksi_id, nama_produk, harga_satuan, quantity, subtotal
+         FROM canteen_sale_items
+         WHERE transaksi_id IN (?)
+         ORDER BY id`,
+        [transactionIds]
+      );
+      const itemsByTransaction = new Map();
+      for (const item of items) {
+        const key = String(item.transaksi_id);
+        if (!itemsByTransaction.has(key)) itemsByTransaction.set(key, []);
+        itemsByTransaction.get(key).push(item);
+      }
+      for (const row of rows) row.items = itemsByTransaction.get(String(row.transaksi_id)) || [];
+    }
     return res.status(200).json({
       data: rows,
       pagination: { page, limit, total: count.total },

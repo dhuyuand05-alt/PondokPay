@@ -127,6 +127,20 @@ export const rateLimitMfa = async (req, res, next) => {
   }
 };
 
+export const rateLimitParentTopupCreation = async (req, res, next) => {
+  try {
+    const result = await hitPersistentRateLimit(`parent-topup:${req.user.id}`, 10);
+    if (!result.allowed) {
+      res.set('Retry-After', String(result.retryAfter));
+      return res.status(429).json({ message: 'Terlalu banyak permintaan top-up. Coba kembali setelah 15 menit.' });
+    }
+    return next();
+  } catch (error) {
+    console.error('Parent top-up rate-limit check failed; request was denied:', error);
+    return res.status(503).json({ message: 'Proteksi permintaan top-up tidak tersedia.' });
+  }
+};
+
 export const clearLoginRateLimit = async (req) => {
   const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
   if (username) {
@@ -154,6 +168,96 @@ export const recordSecurityEvent = async (req, event) => {
   );
 };
 
+const safeAmountLabel = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 9999999999.99) return null;
+  return `Rp ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(amount)}`;
+};
+
+const getStudentName = async (santriId) => {
+  const [rows] = await pool.query(
+    'SELECT nama_lengkap FROM santri WHERE id = ? LIMIT 1',
+    [santriId],
+  );
+  return rows[0]?.nama_lengkap || `santri ID ${santriId}`;
+};
+
+const describeAuditAction = async (req, resource) => {
+  const methodLabels = {
+    POST: 'Menambahkan',
+    PUT: 'Memperbarui',
+    PATCH: 'Memperbarui',
+    DELETE: 'Menghapus',
+  };
+  const santriTransaction = /^\/api\/admin\/santri\/(\d+)\/(topup|tarik)$/.exec(resource);
+  if (santriTransaction) {
+    const [, santriId, transactionType] = santriTransaction;
+    const studentName = await getStudentName(santriId);
+    const amount = safeAmountLabel(req.body?.jumlah);
+    const action = transactionType === 'topup' ? 'Top-up saldo' : 'Penarikan saldo';
+    return `${action} ${studentName}${amount ? ` sebesar ${amount}` : ''}`;
+  }
+  const parentTopup = /^\/api\/wali\/topup$/.test(resource);
+  if (parentTopup) {
+    const santriId = Number(req.body?.santri_id);
+    const studentName = Number.isSafeInteger(santriId) && santriId > 0
+      ? await getStudentName(santriId)
+      : 'santri';
+    const amount = safeAmountLabel(req.body?.amount);
+    return `Membuat pembayaran top-up ${studentName}${amount ? ` sebesar ${amount}` : ''} melalui QRIS`;
+  }
+  const canteenSale = /^\/api\/(?:admin\/kantin|kantin)\/(\d+)\/penjualan$/.exec(resource);
+  if (canteenSale) {
+    const [, canteenId] = canteenSale;
+    const santriId = Number(req.body?.santri_id);
+    const studentName = Number.isSafeInteger(santriId) && santriId > 0
+      ? await getStudentName(santriId)
+      : 'santri';
+    const [rows] = await pool.query('SELECT nama FROM kantin WHERE id = ? LIMIT 1', [canteenId]);
+    const canteenName = rows[0]?.nama || `kantin ID ${canteenId}`;
+    const amount = safeAmountLabel(req.body?.jumlah);
+    return `Transaksi belanja ${studentName} di ${canteenName}${amount ? ` sebesar ${amount}` : ''}`;
+  }
+
+  const patterns = [
+    [/\/api\/admin\/santri\/import$/, 'Mengimpor data santri'],
+    [/\/api\/admin\/santri$/, req.method === 'POST' ? `Menambahkan data santri${req.body?.nama_lengkap ? ` ${String(req.body.nama_lengkap).slice(0, 100)}` : ''}` : 'Memperbarui data santri'],
+    [/\/api\/admin\/santri\/\d+$/, `${methodLabels[req.method]} data santri`],
+    [/\/api\/admin\/kantin\/\d+\/pencairan$/, 'Mencatat pencairan saldo kantin'],
+    [/\/api\/admin\/kantin$/, `${methodLabels[req.method]} data kantin`],
+    [/\/api\/admin\/wali-akun\/\d+\/anak\/\d+$/, 'Melepas santri dari akun wali'],
+    [/\/api\/admin\/wali-akun\/\d+\/anak$/, 'Menghubungkan santri ke akun wali'],
+    [/\/api\/admin\/wali-akun/, `${methodLabels[req.method]} akun wali`],
+    [/\/api\/admin\/wali/, `${methodLabels[req.method]} data wali`],
+    [/\/api\/admin\/financial-approvals\/\d+\/approve$/, 'Menyetujui aksi finansial'],
+    [/\/api\/admin\/financial-approvals\/\d+\/reject$/, 'Menolak aksi finansial'],
+    [/\/api\/admin\/financial-approvals$/, 'Mengajukan persetujuan finansial'],
+    [/\/api\/admin\/cash\/service-fee$/, 'Mengubah tarif layanan bulanan'],
+    [/\/api\/admin\/cash\/income$/, 'Mencatat pemasukan kas admin'],
+    [/\/api\/admin\/cash\/expenses$/, 'Mencatat pengeluaran kas admin'],
+    [/\/api\/admin\/cash\/entries\/\d+\/reverse$/, 'Membalikkan catatan kas admin'],
+    [/\/api\/admin\/settings\/logo$/, req.method === 'DELETE' ? 'Menghapus logo pondok' : 'Mengunggah logo pondok'],
+    [/\/api\/admin\/settings\/midtrans$/, 'Memperbarui pengaturan pembayaran Midtrans'],
+    [/\/api\/admin\/settings$/, 'Memperbarui profil pondok'],
+    [/\/api\/admin\/settings\/whatsapp\/connect$/, 'Menghubungkan WhatsApp bot'],
+    [/\/api\/admin\/settings\/whatsapp\/disconnect$/, 'Memutus WhatsApp bot'],
+    [/\/api\/users$/, `${methodLabels[req.method]} akun pengguna`],
+    [/\/api\/users\/\d+$/, `${methodLabels[req.method]} akun pengguna`],
+    [/\/api\/wali\/anak\/\d+\/limit-harian$/, 'Mengubah limit belanja harian santri'],
+    [/\/api\/wali\/notifikasi\/whatsapp\/verifikasi$/, 'Memulai verifikasi notifikasi WhatsApp'],
+    [/\/api\/wali\/notifikasi\/whatsapp$/, 'Menonaktifkan notifikasi WhatsApp'],
+    [/\/api\/kantin\/\d+\/produk$/, `${methodLabels[req.method]} produk kantin${typeof req.body?.nama === 'string' ? ` ${req.body.nama.slice(0, 100)}` : ''}`],
+    [/\/api\/kantin\/\d+\/produk\/\d+$/, `${methodLabels[req.method]} produk kantin${typeof req.body?.nama === 'string' ? ` ${req.body.nama.slice(0, 100)}` : ''}`],
+    [/\/api\/kantin\/\d+\/katalog$/, 'Mengubah mode katalog kantin'],
+    [/\/api\/kantin\/pencairan\/persetujuan\/\d+\/approve$/, 'Menyetujui pencairan saldo kantin'],
+    [/\/api\/kantin\/pencairan\/persetujuan\/\d+\/reject$/, 'Menolak pencairan saldo kantin'],
+  ];
+  const match = patterns.find(([pattern]) => pattern.test(resource));
+  if (match) return typeof match[1] === 'function' ? match[1]() : match[1];
+
+  return `${methodLabels[req.method] || req.method} ${resource}`;
+};
+
 export const auditMutation = async (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
 
@@ -161,14 +265,17 @@ export const auditMutation = async (req, res, next) => {
   res.set('X-Request-Id', requestId);
   let auditId;
   try {
+    const resource = req.baseUrl + req.path;
+    const details = await describeAuditAction(req, resource);
     const [result] = await pool.query(
-      `INSERT INTO audit_logs (request_id, actor_user_id, action, resource, source_ip, user_agent)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO audit_logs (request_id, actor_user_id, action, resource, details, source_ip, user_agent)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         requestId,
         req.user?.id ?? null,
         req.method,
-        req.baseUrl + req.path,
+        resource,
+        details,
         req.ip ?? null,
         String(req.get('user-agent') ?? '').slice(0, 255),
       ]

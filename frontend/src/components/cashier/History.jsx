@@ -1,20 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useApiData } from '../../hooks.js';
 import {
-  Alert,
   Empty,
   ErrorNotice,
   formatDate,
   formatMoney,
   MobileLoading,
-  MobileTop,
-  TransactionMark,
+  StatusBadge,
 } from '../../ui.jsx';
 
 export function CashierHistory({ token }) {
   const [canteenId, setCanteenId] = useState('');
   const [type, setType] = useState('');
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
   const {
     data: canteenData,
     loading: canteensLoading,
@@ -22,99 +23,206 @@ export function CashierHistory({ token }) {
     refresh: refreshCanteens,
   } = useApiData('/kantin', token);
   const canteens = canteenData?.data || [];
-  const selected = canteens.find((row) => String(row.id) === String(canteenId)) || canteens[0];
+  const selectedCanteen = canteens.find((row) => String(row.id) === String(canteenId)) || canteens[0];
   const query = new URLSearchParams({ page: String(page), limit: '20' });
   if (type) query.set('tipe_transaksi', type);
-  const path = selected ? `/kantin/${selected.id}/transaksi?${query}` : '/kantin';
+  const path = selectedCanteen ? `/kantin/${selectedCanteen.id}/transaksi?${query}` : '/kantin';
   const { data, loading, error, refresh } = useApiData(path, token);
-  if (canteensLoading) return <MobileLoading />;
-  if (canteenError) return <ErrorNotice error={canteenError} onRetry={refreshCanteens} />;
-  if (!selected) return <Empty title="Belum ada kantin" />;
   const rows = data?.data || [];
+  const filteredRows = useMemo(() => {
+    const value = search.trim().toLowerCase();
+    if (!value) return rows;
+    return rows.filter((row) => [
+      row.transaksi_id,
+      row.nama_lengkap,
+      row.nis,
+      row.keterangan,
+      row.tipe_transaksi,
+      ...(row.items || []).map((item) => item.nama_produk),
+    ].some((field) => String(field || '').toLowerCase().includes(value)));
+  }, [rows, search]);
   const totalPages = Math.max(
     1,
     Math.ceil(Number(data?.pagination?.total || 0) / Number(data?.pagination?.limit || 20)),
   );
+  const selected = filteredRows.find((row) => row.id === expandedId) || filteredRows[0];
+
+  if (canteensLoading) return <MobileLoading />;
+  if (canteenError) return <ErrorNotice error={canteenError} onRetry={refreshCanteens} />;
+  if (!selectedCanteen) return <Empty title="Belum ada kantin" />;
+
   return (
-    <div>
-      <MobileTop
-        title="Riwayat kantin"
-        subtitle={`${selected.nama} · Saldo ${formatMoney(selected.saldo)}`}
-      />
-      <div className="mb-5 grid grid-cols-3 gap-1 rounded-xl bg-white p-1">
-        {[
-          ['', 'Semua'],
-          ['penjualan', 'Penjualan'],
-          ['pencairan', 'Pencairan'],
-        ].map(([value, label]) => (
-          <button
-            key={value}
-            className={`rounded-lg px-2 py-3 text-xs font-semibold ${type === value ? 'bg-pondok-600 text-white' : 'text-muted'}`}
-            onClick={() => {
-              setType(value);
+    <section className="mx-auto max-w-[1360px]">
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Riwayat transaksi</h1>
+          <p className="mt-1 text-xs text-muted sm:text-sm">Telusuri penjualan dan pencairan saldo {selectedCanteen.nama}.</p>
+        </div>
+        {canteens.length > 1 ? (
+          <label className="relative block w-full sm:w-56">
+            <select className="field !min-h-10 !py-2 pr-9 text-xs" value={selectedCanteen.id} onChange={(event) => {
+              setCanteenId(event.target.value);
               setPage(1);
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {loading ? (
-        <MobileLoading />
-      ) : error ? (
-        <ErrorNotice error={error} onRetry={refresh} />
-      ) : !rows.length ? (
-        <Empty
-          title="Belum ada transaksi"
-          description="Transaksi kantin yang tercatat akan tampil di sini."
-        />
-      ) : (
-        <div className="space-y-5">
-          {rows.map((item) => (
-            <article key={item.id} className="flex items-center gap-3 border-b border-line pb-3">
-              <TransactionMark type={item.tipe_transaksi} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">
-                  {item.tipe_transaksi === 'pencairan'
-                    ? 'Pencairan oleh admin'
-                    : `${item.nama_lengkap || 'Santri'} · #${item.transaksi_id || item.id}`}
-                </p>
-                <p className="truncate text-xs text-muted">
-                  {formatDate(item.created_at, true)} · {item.keterangan || 'Transaksi selesai'}
-                </p>
-              </div>
-              <p
-                className={`whitespace-nowrap text-sm font-semibold ${item.tipe_transaksi === 'penjualan' ? 'text-pondok-600' : ''}`}
+              setExpandedId(null);
+            }}>
+              {canteens.map((canteen) => <option key={canteen.id} value={canteen.id}>{canteen.nama}</option>)}
+            </select>
+            <ChevronDown size={15} className="pointer-events-none absolute right-3 top-3 text-muted" />
+          </label>
+        ) : (
+          <div className="hidden items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold sm:flex">
+            <CalendarDays size={15} className="text-pondok-700" />
+            {formatDate(new Date())}
+          </div>
+        )}
+      </header>
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_365px] xl:items-start">
+        <div className="min-w-0">
+          <label className="relative block">
+            <Search size={16} className="absolute left-3.5 top-3.5 text-muted" />
+            <input
+              className="field !min-h-11 !py-2.5 pl-10"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari ID transaksi, nama, atau NIS santri"
+              aria-label="Cari transaksi"
+            />
+          </label>
+          <div className="my-3 flex gap-2 overflow-x-auto">
+            {[
+              ['', 'Semua transaksi'],
+              ['penjualan', 'Penjualan'],
+              ['pencairan', 'Pencairan'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                className={`min-h-9 shrink-0 rounded-lg border px-3 text-xs font-semibold transition ${type === value ? 'border-pondok-700 bg-pondok-700 text-white' : 'border-line bg-white text-muted'}`}
+                onClick={() => {
+                  setType(value);
+                  setPage(1);
+                  setExpandedId(null);
+                }}
               >
-                {item.tipe_transaksi === 'penjualan' ? '+' : '−'}
-                {formatMoney(item.jumlah)}
-              </p>
-            </article>
+                {label}
+              </button>
+            ))}
+          </div>
+          {loading ? (
+            <MobileLoading />
+          ) : error ? (
+            <ErrorNotice error={error} onRetry={refresh} />
+          ) : !filteredRows.length ? (
+            <div className="card">
+              <Empty
+                title={rows.length ? 'Transaksi tidak ditemukan' : 'Belum ada transaksi'}
+                description={rows.length ? 'Coba kata kunci lain. Pencarian mencakup halaman yang sedang dibuka.' : 'Transaksi kantin yang tercatat akan tampil di sini.'}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="hidden overflow-hidden rounded-xl border border-line bg-white md:block">
+                <div className="grid grid-cols-[80px_minmax(0,1fr)_110px_120px] bg-[#f5f5f1] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                  <span>ID / waktu</span><span>Santri</span><span>Jenis</span><span className="text-right">Nominal</span>
+                </div>
+                {filteredRows.map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    onClick={() => setExpandedId(row.id)}
+                    className={`grid w-full grid-cols-[80px_minmax(0,1fr)_110px_120px] items-center gap-2 border-t border-line px-4 py-3 text-left transition ${selected?.id === row.id ? 'bg-[#eaf5ef]' : 'hover:bg-canvas'}`}
+                  >
+                    <span><span className="block text-xs font-semibold text-pondok-700">#{row.transaksi_id || row.id}</span><span className="mt-1 block text-[10px] text-muted">{formatDate(row.created_at, true)}</span></span>
+                    <span className="min-w-0"><span className="block truncate text-xs font-semibold">{row.nama_lengkap || 'Pencairan saldo'}</span><span className="mt-1 block truncate text-[10px] text-muted">{row.nis || 'Oleh admin'}</span></span>
+                    <StatusBadge tone={row.tipe_transaksi === 'penjualan' ? 'green' : 'amber'}>{row.tipe_transaksi === 'penjualan' ? 'Penjualan' : 'Pencairan'}</StatusBadge>
+                    <span className="text-right text-xs font-semibold">{formatMoney(row.jumlah)}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-2.5 md:hidden">
+                {filteredRows.map((row) => {
+                  const expanded = selected?.id === row.id;
+                  return (
+                    <article key={row.id} className="overflow-hidden rounded-2xl border border-line bg-white">
+                      <button type="button" className="w-full p-3.5 text-left" onClick={() => setExpandedId(expanded ? null : row.id)}>
+                        <div className="flex items-center justify-between gap-3">
+                          <StatusBadge tone={row.tipe_transaksi === 'penjualan' ? 'green' : 'amber'}>{row.tipe_transaksi === 'penjualan' ? 'Penjualan' : 'Pencairan'}</StatusBadge>
+                          <span className="text-[10px] text-muted">#{row.transaksi_id || row.id} · {formatDate(row.created_at, true)}</span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{row.nama_lengkap || 'Pencairan saldo'}</p>
+                            <p className="mt-0.5 text-[10px] text-muted">{row.nis || 'Oleh admin'}</p>
+                          </div>
+                          <span className="shrink-0 text-base font-semibold">{formatMoney(row.jumlah)}</span>
+                        </div>
+                        <p className="mt-2 flex items-center justify-center gap-1 text-[10px] font-medium text-pondok-700">
+                          {expanded ? 'Tutup rincian' : 'Lihat rincian'} <ChevronDown size={13} className={expanded ? 'rotate-180' : ''} />
+                        </p>
+                      </button>
+                      {expanded && <TransactionDetails row={row} />}
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between text-[11px] text-muted">
+                <span>Halaman {page} · {data?.pagination?.total || 0} transaksi</span>
+                <div className="flex gap-2">
+                  <button className="btn-secondary !min-h-8 !rounded-lg !p-1.5" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} aria-label="Sebelumnya"><ChevronLeft size={16} /></button>
+                  <button className="btn-secondary !min-h-8 !rounded-lg !p-1.5" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)} aria-label="Berikutnya"><ChevronRight size={16} /></button>
+                </div>
+              </div>
+            </>
+          )}
+          <p className="mt-3 hidden rounded-xl bg-[#eaf5ef] p-3 text-[11px] text-[#176b50] lg:block">
+            Pencairan dilakukan admin setelah persetujuan kasir dan tidak terkait dengan santri.
+          </p>
+        </div>
+        {selected && (
+          <aside className="card sticky top-20 hidden p-4 xl:block">
+            <h2 className="text-sm font-semibold">Detail transaksi</h2>
+            <TransactionDetails row={selected} />
+          </aside>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TransactionDetails({ row }) {
+  const isSale = row.tipe_transaksi === 'penjualan';
+  const itemCount = (row.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  return (
+    <div className="border-t border-line px-3.5 py-3">
+      <div className="flex items-center justify-between">
+        <StatusBadge tone={isSale ? 'green' : 'amber'}>{isSale ? 'Penjualan berhasil' : 'Pencairan saldo'}</StatusBadge>
+        <span className="text-[10px] text-muted">#{row.transaksi_id || row.id}</span>
+      </div>
+      <p className="mt-2 text-2xl font-semibold">{formatMoney(row.jumlah)}</p>
+      <p className="mt-0.5 text-[10px] text-muted">{formatDate(row.created_at, true)}</p>
+      <div className="my-3 border-t border-line" />
+      <Detail label="Santri" value={row.nama_lengkap || 'Tanpa santri'} />
+      {row.nis && <Detail label="NIS" value={row.nis} />}
+      <Detail label="Kantin" value={row.kantin_nama || 'Kantin'} />
+      {row.items?.length > 0 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="mb-2 text-xs font-semibold">Rincian belanja · {itemCount} item</p>
+          {row.items.map((item, index) => (
+            <div key={`${item.transaksi_id}-${index}`} className="flex justify-between gap-3 py-1.5 text-xs">
+              <span className="min-w-0"><span className="block truncate">{item.nama_produk}</span><span className="text-[10px] text-muted">{item.quantity} × {formatMoney(item.harga_satuan)}</span></span>
+              <span className="shrink-0 font-medium">{formatMoney(item.subtotal)}</span>
+            </div>
           ))}
         </div>
       )}
-      {data?.pagination && (
-        <div className="mt-5 flex items-center justify-between text-sm text-muted">
-          <span>
-            {data.pagination.total} transaksi · {page}/{totalPages}
-          </span>
-          <div className="flex gap-4">
-            <button disabled={page <= 1} onClick={() => setPage(page - 1)} aria-label="Sebelumnya">
-              ‹
-            </button>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-              aria-label="Berikutnya"
-            >
-              ›
-            </button>
-          </div>
-        </div>
-      )}
-      <Alert className="mt-6">
-        Pencairan ditangani admin pondok. Kasir hanya melihat riwayat kantin yang ditugaskan.
-      </Alert>
+      <div className="my-3 border-t border-line" />
+      <Detail label="Total transaksi" value={formatMoney(row.jumlah)} />
+      <Detail label="Saldo akhir kantin" value={formatMoney(row.saldo_akhir)} />
+      {row.keterangan && <div className="mt-3 rounded-lg bg-[#f5f5f1] p-2.5"><p className="text-[10px] text-muted">Keterangan</p><p className="mt-1 text-xs">{row.keterangan}</p></div>}
+      {!isSale && <p className="mt-3 text-[10px] leading-relaxed text-muted">Pencairan dilakukan admin setelah memperoleh persetujuan kasir.</p>}
     </div>
   );
+}
+
+function Detail({ label, value }) {
+  return <div className="flex items-center justify-between gap-3 py-1.5 text-xs"><span className="text-muted">{label}</span><span className="text-right font-medium">{value}</span></div>;
 }

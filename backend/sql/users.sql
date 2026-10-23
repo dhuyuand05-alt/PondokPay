@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     actor_user_id INT DEFAULT NULL,
     action VARCHAR(10) NOT NULL,
     resource VARCHAR(255) NOT NULL,
+    details VARCHAR(500) DEFAULT NULL,
     source_ip VARCHAR(45) DEFAULT NULL,
     user_agent VARCHAR(255) DEFAULT NULL,
     status_code SMALLINT DEFAULT NULL,
@@ -83,6 +84,7 @@ BEGIN
         OR NOT (NEW.actor_user_id <=> OLD.actor_user_id)
         OR NOT (NEW.action <=> OLD.action)
         OR NOT (NEW.resource <=> OLD.resource)
+        OR NOT (NEW.details <=> OLD.details)
         OR NOT (NEW.source_ip <=> OLD.source_ip)
         OR NOT (NEW.user_agent <=> OLD.user_agent)
         OR NOT (NEW.created_at <=> OLD.created_at)

@@ -6,8 +6,41 @@ CREATE TABLE IF NOT EXISTS kantin (
     nama VARCHAR(100) NOT NULL,
     lokasi VARCHAR(255) DEFAULT NULL,
     status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+    catalog_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     saldo DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS institution_settings (
+    id TINYINT UNSIGNED PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    address VARCHAR(255) DEFAULT NULL,
+    phone VARCHAR(30) DEFAULT NULL,
+    email VARCHAR(254) DEFAULT NULL,
+    manager_name VARCHAR(100) DEFAULT NULL,
+    logo_path VARCHAR(255) DEFAULT NULL,
+    app_name VARCHAR(80) DEFAULT NULL,
+    timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Jakarta',
+    midtrans_merchant_id VARCHAR(100) DEFAULT NULL,
+    midtrans_client_key VARCHAR(255) DEFAULT NULL,
+    midtrans_server_key_enc TEXT DEFAULT NULL,
+    midtrans_environment ENUM('sandbox', 'production') NOT NULL DEFAULT 'sandbox'
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO institution_settings
+    (id, name, address, phone, email, manager_name, timezone)
+VALUES (1, 'Nama Pondok', 'Jl. Contoh No. 123, Kabupaten/Kota',
+    '+62 812-0000-0000', 'info@contoh.ponpes.id', 'Nama Penanggung Jawab', 'Asia/Jakarta');
+
+CREATE TABLE IF NOT EXISTS parent_notification_settings (
+    user_id INT PRIMARY KEY,
+    whatsapp_number VARCHAR(16) NOT NULL,
+    verification_code_hash CHAR(64) DEFAULT NULL,
+    verification_expires_at DATETIME DEFAULT NULL,
+    verified_at DATETIME DEFAULT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_parent_notification_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS santri (
@@ -59,6 +92,57 @@ CREATE TABLE IF NOT EXISTS transaksi (
         REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS midtrans_topup_payments (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    santri_id INT NOT NULL,
+    order_id VARCHAR(50) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(64) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    status ENUM('creating', 'pending', 'paid', 'expired', 'failed') NOT NULL DEFAULT 'creating',
+    snap_token VARCHAR(255) DEFAULT NULL,
+    qr_string TEXT DEFAULT NULL,
+    qr_code_url VARCHAR(1000) DEFAULT NULL,
+    midtrans_client_key VARCHAR(255) DEFAULT NULL,
+    midtrans_server_key_enc TEXT DEFAULT NULL,
+    midtrans_environment ENUM('sandbox', 'production') DEFAULT NULL,
+    provider_transaction_id VARCHAR(100) DEFAULT NULL,
+    ledger_transaction_id BIGINT DEFAULT NULL UNIQUE,
+    expires_at DATETIME DEFAULT NULL,
+    paid_at DATETIME DEFAULT NULL,
+    status_checked_at DATETIME DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_midtrans_payment_user_idempotency (user_id, idempotency_key),
+    INDEX idx_midtrans_payment_user_created (user_id, created_at),
+    INDEX idx_midtrans_payment_status_created (status, created_at),
+    CONSTRAINT fk_midtrans_payment_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_midtrans_payment_santri FOREIGN KEY (santri_id)
+        REFERENCES santri(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_midtrans_payment_ledger FOREIGN KEY (ledger_transaction_id)
+        REFERENCES transaksi(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS whatsapp_notification_outbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    transaction_id BIGINT NOT NULL,
+    user_id INT NOT NULL,
+    status ENUM('pending', 'processing', 'sent', 'failed') NOT NULL DEFAULT 'pending',
+    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processing_at DATETIME DEFAULT NULL,
+    sent_at DATETIME DEFAULT NULL,
+    last_error VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_whatsapp_notification_transaction_user (transaction_id, user_id),
+    INDEX idx_whatsapp_notification_queue (status, next_attempt_at),
+    CONSTRAINT fk_whatsapp_notification_transaction FOREIGN KEY (transaction_id)
+        REFERENCES transaksi(id) ON DELETE CASCADE,
+    CONSTRAINT fk_whatsapp_notification_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS wali_santri (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT DEFAULT NULL,
@@ -106,6 +190,64 @@ CREATE TABLE IF NOT EXISTS kantin_kasir (
         REFERENCES kantin(id) ON DELETE CASCADE,
     CONSTRAINT fk_kantin_kasir_user FOREIGN KEY (user_id)
         REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS canteen_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    kantin_id INT NOT NULL,
+    nama VARCHAR(120) NOT NULL,
+    kategori VARCHAR(80) NOT NULL DEFAULT 'Umum',
+    sku VARCHAR(40) DEFAULT NULL,
+    barcode VARCHAR(80) DEFAULT NULL,
+    harga DECIMAL(10,2) NOT NULL,
+    stok INT UNSIGNED NOT NULL DEFAULT 0,
+    stok_minimum INT UNSIGNED NOT NULL DEFAULT 5,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_canteen_product_sku (kantin_id, sku),
+    UNIQUE KEY uq_canteen_product_barcode (kantin_id, barcode),
+    INDEX idx_canteen_product_catalog (kantin_id, is_active, kategori, nama),
+    CONSTRAINT fk_canteen_product_kantin FOREIGN KEY (kantin_id)
+        REFERENCES kantin(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS canteen_sale_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    transaksi_id BIGINT NOT NULL,
+    product_id INT NOT NULL,
+    nama_produk VARCHAR(120) NOT NULL,
+    sku VARCHAR(40) DEFAULT NULL,
+    harga_satuan DECIMAL(10,2) NOT NULL,
+    quantity INT UNSIGNED NOT NULL,
+    subtotal DECIMAL(12,2) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_canteen_sale_items_transaction (transaksi_id),
+    INDEX idx_canteen_sale_items_product (product_id),
+    CONSTRAINT fk_canteen_sale_item_transaction FOREIGN KEY (transaksi_id)
+        REFERENCES transaksi(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_sale_item_product FOREIGN KEY (product_id)
+        REFERENCES canteen_products(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS canteen_stock_movements (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    transaksi_id BIGINT DEFAULT NULL,
+    user_id INT DEFAULT NULL,
+    movement_type ENUM('adjustment', 'sale') NOT NULL,
+    quantity_change INT NOT NULL,
+    stock_after INT UNSIGNED NOT NULL,
+    note VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_canteen_stock_product_created (product_id, created_at),
+    INDEX idx_canteen_stock_transaction (transaksi_id),
+    CONSTRAINT fk_canteen_stock_product FOREIGN KEY (product_id)
+        REFERENCES canteen_products(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_stock_transaction FOREIGN KEY (transaksi_id)
+        REFERENCES transaksi(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_stock_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS service_fee_rates (

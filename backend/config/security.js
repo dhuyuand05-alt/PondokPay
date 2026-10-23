@@ -48,6 +48,9 @@ export const decryptMfaSecret = (value) => {
   ]).toString('utf8');
 };
 
+export const encryptApplicationSecret = (secret) => encryptMfaSecret(secret);
+export const decryptApplicationSecret = (value) => decryptMfaSecret(value);
+
 export const generateTotpSecret = () => {
   const bytes = randomBytes(20);
   let bits = '';

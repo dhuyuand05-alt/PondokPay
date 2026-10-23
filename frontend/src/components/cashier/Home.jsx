@@ -2,12 +2,12 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
   ChevronDown,
   CircleCheck,
   CreditCard,
   Fingerprint,
+  Package,
   ShieldCheck,
 } from 'lucide-react';
 import { api, idempotencyKey } from '../../api.js';
@@ -21,11 +21,10 @@ import {
   formatDate,
   formatMoney,
   MobileLoading,
-  MobileTop,
   StatusBadge,
-  TransactionMark,
 } from '../../ui.jsx';
 import { METHOD_FIELDS, PurchaseForm } from './shared.jsx';
+import { CatalogPOS } from './CatalogPOS.jsx';
 
 export function CashierHome({ token }) {
   const navigate = useNavigate();
@@ -33,15 +32,15 @@ export function CashierHome({ token }) {
   const [method, setMethod] = useState('RFID');
   const [lookupValue, setLookupValue] = useState('');
   const [student, setStudent] = useState(null);
+  const [saleReceipt, setSaleReceipt] = useState(null);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [saleMode, setSaleMode] = useState('catalog');
+  const [cartItems, setCartItems] = useState([]);
   const [step, setStep] = useState('amount');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [payoutBusyId, setPayoutBusyId] = useState('');
-  const [payoutError, setPayoutError] = useState('');
-  const [payoutNotice, setPayoutNotice] = useState('');
   const idempotency = useRef(null);
   const field = METHOD_FIELDS[method];
   const {
@@ -53,36 +52,18 @@ export function CashierHome({ token }) {
   const canteens = canteenData?.data || [];
   const selectedCanteen =
     canteens.find((item) => String(item.id) === String(canteenId)) || canteens[0];
-  const historyPath = selectedCanteen
-    ? `/kantin/${selectedCanteen.id}/transaksi?limit=3`
+  const catalogEnabled = Boolean(selectedCanteen?.catalog_enabled);
+  const usesCatalog = catalogEnabled && saleMode === 'catalog';
+  const catalogPath = selectedCanteen?.catalog_enabled
+    ? `/kantin/${selectedCanteen.id}/produk`
     : '/kantin';
-  const { data: historyData, refresh: refreshHistory } = useApiData(historyPath, token);
-  const transactions = historyData?.data || [];
-  const { data: payoutApprovalData, refresh: refreshPayoutApprovals } = useApiData(
-    '/kantin/pencairan/persetujuan',
-    token,
-  );
-  const payoutApprovals = payoutApprovalData?.data || [];
-
-  const decidePayout = async (approvalId, decision) => {
-    setPayoutBusyId(String(approvalId));
-    setPayoutError('');
-    setPayoutNotice('');
-    try {
-      const result = await api.post(
-        `/kantin/pencairan/persetujuan/${approvalId}/${decision}`,
-        {},
-        token,
-      );
-      setPayoutNotice(result.message);
-      refreshPayoutApprovals();
-    } catch (err) {
-      setPayoutError(err.message);
-    } finally {
-      setPayoutBusyId('');
-    }
-  };
-
+  const {
+    data: catalogData,
+    loading: catalogLoading,
+    error: catalogError,
+    refresh: refreshCatalog,
+  } = useApiData(catalogPath, token);
+  const catalogProducts = catalogData?.data || [];
   const lookupStudent = async (event) => {
     event.preventDefault();
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
@@ -94,6 +75,7 @@ export function CashierHome({ token }) {
     setError('');
     setNotice('');
     setStudent(null);
+    setSaleReceipt(null);
     try {
       const result = await api.post(
         `/kantin/${selectedCanteen.id}/santri/lookup`,
@@ -124,12 +106,15 @@ export function CashierHome({ token }) {
         `/kantin/${selectedCanteen.id}/penjualan`,
         {
           santri_id: student.id,
-          jumlah: Number(amount),
-          keterangan: description || null,
+          ...(usesCatalog
+            ? { items: cartItems, jumlah: Number(amount) }
+            : { jumlah: Number(amount) }),
+          keterangan: description || (usesCatalog ? 'Pembelian katalog' : null),
         },
         token,
         { idempotencyKey: idempotency.current },
       );
+      setSaleReceipt(result.data);
       setStudent((previous) =>
         previous
           ? {
@@ -146,7 +131,9 @@ export function CashierHome({ token }) {
       setNotice(result.message || 'Pembayaran berhasil.');
       setStep('success');
       idempotency.current = null;
-      refreshHistory();
+      if (selectedCanteen?.catalog_enabled) {
+        refreshCatalog();
+      }
     } catch (err) {
       setError(err.message);
       if (err.status === 409)
@@ -160,8 +147,10 @@ export function CashierHome({ token }) {
 
   const reset = () => {
     setStudent(null);
+    setSaleReceipt(null);
     setAmount('');
     setDescription('');
+    setCartItems([]);
     setStep('amount');
     setError('');
     setNotice('');
@@ -170,14 +159,38 @@ export function CashierHome({ token }) {
   };
   const changeCanteen = (nextId) => {
     setCanteenId(nextId);
+    setSaleMode(
+      canteens.find((item) => String(item.id) === String(nextId))?.catalog_enabled
+        ? 'catalog'
+        : 'manual',
+    );
     setStudent(null);
+    setSaleReceipt(null);
     setAmount('');
     setDescription('');
+    setCartItems([]);
     setLookupValue('');
     setStep('amount');
     setError('');
     setNotice('');
     idempotency.current = null;
+  };
+  const changeCartQuantity = (product, difference) => {
+    const current = cartItems.find((item) => Number(item.product_id) === Number(product.id));
+    const nextQuantity = (current?.quantity || 0) + difference;
+    if (nextQuantity > Number(product.stok)) return;
+    const nextCart = current
+      ? cartItems.map((item) => Number(item.product_id) === Number(product.id)
+        ? { ...item, quantity: nextQuantity }
+        : item).filter((item) => item.quantity > 0)
+      : [...cartItems, { product_id: Number(product.id), quantity: 1 }];
+    const productById = new Map(catalogProducts.map((item) => [Number(item.id), item]));
+    const nextAmount = nextCart.reduce((sum, item) => {
+      const selected = productById.get(Number(item.product_id));
+      return sum + Number(selected?.harga || 0) * item.quantity;
+    }, 0);
+    setCartItems(nextCart);
+    setAmount(nextAmount.toFixed(2));
   };
 
   if (loading) return <MobileLoading />;
@@ -200,33 +213,36 @@ export function CashierHome({ token }) {
     );
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className={`mx-auto w-full ${usesCatalog ? 'max-w-[1180px]' : 'max-w-3xl'}`}>
       {step !== 'amount' && step !== 'success' && (
         <button
           className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 font-semibold text-pondok-700 transition hover:bg-pondok-50"
           onClick={() => {
             setError('');
+            if (selectedCanteen?.catalog_enabled) refreshCatalog();
             setStep(step === 'confirm' ? 'credential' : 'amount');
           }}
         >
           <ArrowLeft size={18} />
-          {step === 'confirm' ? 'Periksa kredensial lagi' : 'Ubah nominal'}
+          {step === 'confirm'
+            ? 'Periksa kredensial lagi'
+            : usesCatalog ? 'Ubah keranjang' : 'Ubah nominal'}
         </button>
       )}
       {step === 'amount' && (
         <>
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm text-muted">
-                Assalamu’alaikum,{' '}
-                {JSON.parse(sessionStorage.getItem('pondokpay.user') || '{}').username || 'Kasir'}
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+                {usesCatalog ? 'Kasir produk' : 'Catat nominal'}
+              </h1>
+              <p className="mt-1 text-xs text-muted sm:text-sm">
+                {usesCatalog ? 'Pilih belanjaan, verifikasi santri, lalu konfirmasi pembayaran.' : 'Catat nominal belanja lalu verifikasi santri.'}
               </p>
-              <p className="mt-1 text-2xl font-semibold tracking-tight">Transaksi baru</p>
             </div>
-            <label className="relative block w-full sm:max-w-xs">
-              <span className="label">Kantin aktif</span>
+            <label className="relative block w-full sm:max-w-[240px]">
               <select
-                className="field appearance-none pr-10"
+                className="field !min-h-10 appearance-none !py-2 pr-9 text-xs font-semibold"
                 value={selectedCanteen?.id || ''}
                 onChange={(e) => changeCanteen(e.target.value)}
               >
@@ -238,92 +254,79 @@ export function CashierHome({ token }) {
               </select>
               <ChevronDown
                 size={18}
-                className="pointer-events-none absolute right-3 top-10 text-muted"
+                className="pointer-events-none absolute right-3 top-2.5 text-muted"
               />
             </label>
           </div>
-          <div className="mb-4 grid grid-cols-3 gap-2">
-            {[
-              ['1', 'Nominal'],
-              ['2', 'Kredensial'],
-              ['3', 'Konfirmasi'],
-            ].map(([number, label], index) => (
-              <div
-                key={number}
-                className={`rounded-xl px-2 py-2.5 text-center text-xs font-semibold sm:flex sm:items-center sm:justify-center sm:gap-2 ${index === 0 ? 'bg-pondok-700 text-white' : 'bg-white text-muted'}`}
-              >
-                <span className="mx-auto mb-1 grid h-5 w-5 place-items-center rounded-full bg-black/10 sm:mx-0 sm:mb-0">
-                  {number}
-                </span>
-                {label}
-              </div>
-            ))}
-          </div>
-          <div className="rounded-2xl bg-gradient-to-br from-pondok-700 to-pondok-800 p-4 text-white shadow-sm sm:p-5">
-            <div className="flex items-center justify-between text-sm text-white/75">
-              <span>Saldo kantin</span>
-              <CreditCard size={19} />
-            </div>
-            <p className="mt-2 text-2xl font-semibold sm:text-3xl">
-              {formatMoney(selectedCanteen?.saldo)}
-            </p>
-            <p className="mt-1 text-xs text-white/65">
-              {selectedCanteen?.lokasi || 'Saldo penjualan kantin'}
-            </p>
-          </div>
-          <PurchaseForm
-            amount={amount}
-            setAmount={setAmount}
-            description={description}
-            setDescription={setDescription}
-            error={error}
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = Number(amount);
-              if (!Number.isFinite(value) || value <= 0) {
-                setError('Masukkan nominal belanja yang valid.');
-                return;
-              }
-              setError('');
-              setStep('credential');
-            }}
-          />
-          <section className="mt-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold">Penjualan terakhir</h2>
-              <button
-                className="text-sm font-semibold text-pondok-600"
-                onClick={() => navigate('/kasir/history')}
-              >
-                Riwayat →
-              </button>
-            </div>
-            {!transactions.length ? (
-              <p className="rounded-xl bg-white p-4 text-sm text-muted">
-                Belum ada transaksi tercatat.
-              </p>
-            ) : (
-              transactions.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 rounded-xl border-b border-line bg-white px-3 py-3 last:border-0"
+          {catalogEnabled && (
+            <div className="mb-3 flex rounded-xl border border-line bg-white p-1" aria-label="Mode transaksi">
+              {[
+                ['catalog', 'Kasir produk'],
+                ['manual', 'Catat nominal'],
+              ].map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`min-h-9 flex-1 rounded-lg px-2 text-xs font-semibold transition ${saleMode === mode ? 'bg-pondok-700 text-white' : 'text-muted hover:bg-canvas'}`}
+                  aria-pressed={saleMode === mode}
+                  onClick={() => {
+                    setSaleMode(mode);
+                    setAmount('');
+                    setDescription('');
+                    setCartItems([]);
+                    setError('');
+                  }}
                 >
-                  <TransactionMark type={item.tipe_transaksi} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">
-                      {item.nama_lengkap || 'Transaksi kantin'}
-                    </p>
-                    <p className="truncate text-xs text-muted">
-                      {formatDate(item.created_at, true)} · {item.keterangan || `#${item.id}`}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold text-pondok-600">
-                    +{formatMoney(item.jumlah)}
-                  </span>
-                </div>
-              ))
-            )}
-          </section>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {usesCatalog ? (
+            <section className="mt-3">
+              {catalogError ? (
+                <ErrorNotice error={catalogError} onRetry={refreshCatalog} />
+              ) : catalogLoading ? (
+                <MobileLoading text="Memuat katalog..." />
+              ) : (
+                <CatalogPOS
+                  products={catalogProducts}
+                  cartItems={cartItems}
+                  setCartItems={setCartItems}
+                  onCheckout={() => {
+                    const productsById = new Map(catalogProducts.map((product) => [Number(product.id), product]));
+                    const total = cartItems.reduce((sum, item) => {
+                      const product = productsById.get(Number(item.product_id));
+                      return sum + Number(product?.harga || 0) * item.quantity;
+                    }, 0);
+                    if (!cartItems.length || total <= 0) return;
+                    setAmount(total.toFixed(2));
+                    setDescription('Pembelian katalog');
+                    setError('');
+                    setStep('credential');
+                  }}
+                />
+              )}
+            </section>
+          ) : (
+            <PurchaseForm
+              amount={amount}
+              setAmount={setAmount}
+              description={description}
+              setDescription={setDescription}
+              error={error}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const value = Number(amount);
+                if (!Number.isFinite(value) || value <= 0) {
+                  setError('Masukkan nominal belanja yang valid.');
+                  return;
+                }
+                setError('');
+                setStep('credential');
+              }}
+            />
+          )}
         </>
       )}
       {step === 'credential' && (
@@ -399,43 +402,73 @@ export function CashierHome({ token }) {
         </section>
       )}
       {step === 'confirm' && student && (
-        <div>
+        <div className="mx-auto max-w-[760px] pb-28 lg:pb-0">
           <div className="mb-4">
-            <StatusBadge>Langkah 3 dari 3</StatusBadge>
-            <h1 className="mt-3 text-xl font-semibold">Konfirmasi pembayaran</h1>
-            <p className="mt-1 text-sm text-muted">{selectedCanteen?.nama}</p>
+            <h1 className="text-xl font-semibold">Konfirmasi belanja</h1>
+            <p className="mt-1 text-xs text-muted">{selectedCanteen?.nama} · {usesCatalog ? `${cartItems.reduce((sum, item) => sum + item.quantity, 0)} item` : 'Transaksi nominal'}</p>
           </div>
-          <div className="card p-4 sm:p-6">
-            <p className="text-center text-sm text-muted">Total pembayaran</p>
-            <p className="mt-1 text-center text-3xl font-semibold sm:text-4xl">
-              {formatMoney(amount)}
-            </p>
-            <div className="mt-3 text-center">
-              <StatusBadge tone="amber">Belum dibayar</StatusBadge>
-            </div>
-            <hr className="my-5 border-line" />
+          <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold text-pondok-700">
+            <span className="rounded-full bg-[#e8f4ed] px-2.5 py-1">1 · Belanja</span>
+            <span className="text-muted">›</span>
+            <span className="rounded-full bg-[#e8f4ed] px-2.5 py-1">2 · Konfirmasi</span>
+          </div>
+          <div className="card p-3.5 sm:p-5">
+            {usesCatalog && (
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-semibold">Keranjang</p>
+                  <button type="button" className="text-xs font-semibold text-pondok-700" onClick={() => setStep('amount')}>Ubah belanja</button>
+                </div>
+                <div className="divide-y divide-line">
+                  {cartItems.map((item) => {
+                    const product = catalogProducts.find((row) => Number(row.id) === Number(item.product_id));
+                    if (!product) return null;
+                    return (
+                      <div key={item.product_id} className="flex items-center gap-2 py-2.5">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#e8f4ed] text-[10px] font-semibold text-pondok-800">
+                          {product.nama.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase()}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold">{product.nama}</p>
+                          <p className="text-[10px] text-muted">{item.quantity} × {formatMoney(product.harga)}</p>
+                        </div>
+                        <div className="flex items-center gap-1 rounded-lg bg-canvas p-1">
+                          <button type="button" className="grid h-6 w-6 place-items-center rounded-md text-muted" aria-label={`Kurangi ${product.nama}`} onClick={() => changeCartQuantity(product, -1)}>−</button>
+                          <span className="w-4 text-center text-xs">{item.quantity}</span>
+                          <button type="button" className="grid h-6 w-6 place-items-center rounded-md text-pondok-700 disabled:opacity-40" aria-label={`Tambah ${product.nama}`} disabled={Number(product.stok) <= item.quantity} onClick={() => changeCartQuantity(product, 1)}>+</button>
+                        </div>
+                        <span className="w-[72px] text-right text-xs font-semibold">{formatMoney(Number(product.harga) * item.quantity)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between border-t border-line pt-3 text-xs">
+                  <span className="text-muted">Total · {cartItems.reduce((sum, item) => sum + item.quantity, 0)} item</span>
+                  <span className="font-semibold">{formatMoney(amount)}</span>
+                </div>
+              </div>
+            )}
+            {!usesCatalog && (
+              <div className="mb-4 flex items-center justify-between">
+                <div><p className="text-xs text-muted">Nominal belanja</p><p className="mt-1 text-2xl font-semibold">{formatMoney(amount)}</p></div>
+                <button type="button" className="text-xs font-semibold text-pondok-700" onClick={() => setStep('amount')}>Ubah nominal</button>
+              </div>
+            )}
+            <div className="rounded-xl border border-[#cfe8d9] bg-[#eaf5ef] p-3">
             <div className="flex items-center gap-3">
-              <Avatar name={student.nama_lengkap} />
+              <Avatar name={student.nama_lengkap} className="bg-[#d8eddf] text-pondok-800" />
               <div className="min-w-0">
                 <p className="font-semibold">{student.nama_lengkap}</p>
-                <p className="text-xs text-muted">
-                  {student.nis} · {student.asrama || 'Santri'}
-                </p>
+                <p className="text-xs text-muted">{student.nis} · {student.asrama || 'Santri'}</p>
               </div>
               <StatusBadge>Terverifikasi</StatusBadge>
             </div>
-            <hr className="my-5 border-line" />
-            <AmountLine label="Keterangan" amount={description || '—'} />
-            <AmountLine label="Saldo saat ini" amount={formatMoney(student.saldo)} />
-            <AmountLine
-              label="Saldo setelah pembayaran"
-              amount={formatMoney(Number(student.saldo) - Number(amount))}
-              strong
-            />
-            <AmountLine
-              label="Sisa limit setelah transaksi"
-              amount={formatMoney(Math.max(0, Number(student.sisa_limit_harian) - Number(amount)))}
-            />
+            <div className="mt-3 grid grid-cols-2 gap-3 border-t border-[#cfe8d9] pt-3">
+              <div><p className="text-[10px] text-muted">Saldo santri</p><p className="mt-0.5 text-sm font-semibold">{formatMoney(student.saldo)}</p></div>
+              <div><p className="text-[10px] text-muted">Sisa limit harian</p><p className="mt-0.5 text-sm font-semibold">{formatMoney(student.sisa_limit_harian)}</p></div>
+            </div>
+            <p className="mt-2 text-[10px] text-muted">Limit {formatMoney(student.limit_harian)} · Terpakai hari ini {formatMoney(student.belanja_hari_ini)}</p>
+            </div>
           </div>
           {error && (
             <Alert type="error" className="mt-4">
@@ -447,163 +480,84 @@ export function CashierHome({ token }) {
               {notice}
             </Alert>
           )}
-          <Alert className="mt-4">
-            Periksa identitas dan nominal. Saldo dipotong hanya setelah transaksi berhasil
-            dikonfirmasi.
-          </Alert>
-          <button
-            className="btn-primary mt-5 min-h-14 w-full !py-4"
-            disabled={
-              busy ||
-              Number(amount) > Number(student.saldo) ||
-              Number(amount) > Number(student.sisa_limit_harian)
-            }
-            onClick={pay}
-          >
-            <ShieldCheck size={18} />
-            {busy ? 'Memproses transaksi...' : 'Konfirmasi pembayaran'}
-          </button>
-          <button
-            className="btn-secondary mt-3 min-h-12 w-full"
-            disabled={busy}
-            onClick={() => {
-              setError('');
-              setStep('amount');
-            }}
-          >
-            Ubah nominal
-          </button>
-          <p className="mt-4 text-center text-xs text-muted">
-            Jika respons tidak diterima, transaksi akan diulang dengan aman tanpa debit ganda.
-          </p>
+          <section className="card mt-3 p-3.5 sm:p-4">
+            <h2 className="text-sm font-semibold">Setelah pembayaran</h2>
+            <AmountLine label="Saldo setelah bayar" amount={formatMoney(Number(student.saldo) - Number(amount))} positive />
+            <AmountLine label="Sisa limit harian" amount={formatMoney(Math.max(0, Number(student.sisa_limit_harian) - Number(amount)))} positive />
+            {Number(amount) > Number(student.saldo) || Number(amount) > Number(student.sisa_limit_harian)
+              ? <Alert type="error" className="mt-2">Saldo atau sisa limit harian tidak mencukupi.</Alert>
+              : <Alert className="mt-2"><ShieldCheck size={15} />Saldo dan sisa limit mencukupi untuk belanja ini.</Alert>}
+          </section>
+          <p className="mt-3 text-[10px] leading-relaxed text-muted">Jika harga atau stok berubah, pilihan tetap tersimpan. Tinjau perubahan dan konfirmasi ulang. Jika koneksi terputus, ulangi transaksi yang sama dan jangan mulai transaksi baru.</p>
+          <div className="fixed inset-x-0 bottom-[50px] z-20 border-t border-line bg-white px-4 py-2 lg:static lg:mt-4 lg:border-0 lg:bg-transparent lg:p-0">
+            <div className="mx-auto flex max-w-[760px] items-center justify-between text-xs">
+              <span className="text-muted">Total pembayaran</span><span className="font-semibold">{formatMoney(amount)}</span>
+            </div>
+            <button
+              className="btn-primary mx-auto mt-2 min-h-11 w-full max-w-[760px] !py-2.5"
+              disabled={busy || Number(amount) > Number(student.saldo) || Number(amount) > Number(student.sisa_limit_harian)}
+              onClick={pay}
+            >
+              <ShieldCheck size={16} />{busy ? 'Memproses transaksi...' : `Bayar ${formatMoney(amount)}`}
+            </button>
+            <p className="mt-1.5 text-center text-[10px] text-muted">Dipotong dari saldo {student.nama_lengkap}</p>
+          </div>
         </div>
       )}
       {step === 'success' && student && (
-        <div className="pt-7 text-center">
-          <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-pondok-50 text-pondok-600">
-            <CircleCheck size={44} />
+        <div className="mx-auto max-w-[650px] pb-4 pt-2 text-center">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-[#cfe8d9] bg-[#eaf5ef] text-pondok-700">
+            <CircleCheck size={34} strokeWidth={1.6} />
           </div>
-          <h2 className="mt-5 text-2xl font-medium">Pembayaran berhasil</h2>
-          <p className="mt-2 text-sm text-muted">
-            Transaksi telah terkonfirmasi dan saldo santri sudah diperbarui.
-          </p>
-          <div className="card mt-6 p-5 text-left">
-            <div className="text-center">
-              <StatusBadge>Terkonfirmasi</StatusBadge>
-              <p className="mt-2 text-3xl font-medium">{formatMoney(amount)}</p>
-              <p className="mt-1 text-xs text-muted">
-                Transaksi tercatat · {formatDate(new Date(), true)}
-              </p>
+          <h2 className="mt-3 text-xl font-semibold">Transaksi berhasil</h2>
+          <p className="mt-1 text-xs text-muted">Belanja tercatat. Saldo santri telah dipotong.</p>
+          <div className="card mt-4 p-4 text-left sm:p-5">
+            <div className="border-b border-line pb-3 text-center">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted">Total pembayaran</p>
+              <p className="mt-1 text-3xl font-semibold">{formatMoney(amount)}</p>
+              <p className="mt-1 text-[10px] text-muted">#{saleReceipt?.transaksi_id || saleReceipt?.id || '—'} · {formatDate(new Date(), true)}</p>
             </div>
-            <hr className="my-5 border-line" />
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 border-b border-line py-3">
               <Avatar name={student.nama_lengkap} />
-              <div>
+              <div className="min-w-0">
                 <p className="font-semibold">{student.nama_lengkap}</p>
-                <p className="text-xs text-muted">
-                  {student.nis} · {student.asrama || 'Santri'}
-                </p>
+                <p className="text-xs text-muted">{student.nis} · {student.asrama || 'Santri'}</p>
               </div>
             </div>
-            <hr className="my-4 border-line" />
-            <AmountLine label="Kantin" amount={selectedCanteen?.nama} />
-            <AmountLine label="Keterangan" amount={description || '—'} />
-            <AmountLine label="Saldo sekarang" amount={formatMoney(student.saldo)} strong />
-            <AmountLine label="Belanja hari ini" amount={formatMoney(student.belanja_hari_ini)} />
-            <AmountLine
-              label="Sisa limit hari ini"
-              amount={formatMoney(student.sisa_limit_harian)}
-            />
+            {usesCatalog && (
+              <div className="border-b border-line py-2">
+                {cartItems.map((item) => {
+                  const product = catalogProducts.find((row) => Number(row.id) === Number(item.product_id));
+                  if (!product) return null;
+                  return (
+                    <div key={item.product_id} className="flex items-center justify-between gap-3 py-2 text-xs">
+                      <span>{product.nama} <span className="text-muted">× {item.quantity}</span></span>
+                      <span className="font-semibold">{formatMoney(Number(product.harga) * item.quantity)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="py-2">
+              <AmountLine label="Total item" amount={`${usesCatalog ? cartItems.reduce((sum, item) => sum + item.quantity, 0) : 1}`} />
+              <AmountLine label="Pembayaran" amount="Saldo santri" />
+              <AmountLine label="Saldo santri saat ini" amount={formatMoney(student.saldo)} positive />
+              <AmountLine label="Sisa limit harian" amount={formatMoney(student.sisa_limit_harian)} positive />
+              <AmountLine label="Kasir" amount={JSON.parse(sessionStorage.getItem('pondokpay.user') || '{}').username || 'Kasir'} />
+              <AmountLine label="Saldo akhir kantin" amount={formatMoney(saleReceipt?.kantin?.saldo ?? selectedCanteen?.saldo)} />
+              {description && <AmountLine label="Keterangan" amount={description} />}
+            </div>
           </div>
-          <button className="btn-primary mt-5 w-full !py-4" onClick={reset}>
+          {usesCatalog && <Alert className="mt-3 text-left"><Package size={15} />Stok produk terkait telah diperbarui.</Alert>}
+          <button className="btn-primary mt-4 min-h-11 w-full !py-2.5" onClick={reset}>
             <Check size={18} />
             Transaksi berikutnya
           </button>
-          <button className="btn-secondary mt-3 w-full" onClick={() => navigate('/kasir/history')}>
+          <button className="btn-secondary mt-2 min-h-10 w-full !py-2" onClick={() => navigate('/kasir/history')}>
             Lihat riwayat kantin
           </button>
-          <p className="mt-4 text-xs text-muted">
-            <ShieldCheck className="mr-1 inline" size={15} />
-            Tercatat aman di riwayat transaksi
-          </p>
         </div>
       )}
-      <section className="mt-8 rounded-2xl border border-line bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Konfirmasi pencairan kantin</h2>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              Permintaan untuk kantin yang ditugaskan akan muncul di sini. Konfirmasi ini
-              menggunakan sesi kasir yang sudah diverifikasi MFA.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="text-sm font-semibold text-pondok-600"
-            onClick={refreshPayoutApprovals}
-          >
-            Muat ulang
-          </button>
-        </div>
-        {payoutError && (
-          <Alert type="error" className="mt-4">
-            {payoutError}
-          </Alert>
-        )}
-        {payoutNotice && (
-          <Alert type="success" className="mt-4">
-            {payoutNotice}
-          </Alert>
-        )}
-        {payoutApprovals.length ? (
-          <div className="mt-3 divide-y divide-line">
-            {payoutApprovals.map((approval) => (
-              <div key={approval.id} className="py-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold">
-                      {approval.kantin_nama} · {formatMoney(approval.amount)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">
-                      Diminta oleh {approval.requester_username} ·{' '}
-                      {formatDate(approval.created_at, true)}
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm">
-                      {approval.keterangan || 'Tanpa keterangan'}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">
-                      Berlaku sampai {formatDate(approval.expires_at, true)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    className="btn-primary min-h-11 flex-1"
-                    disabled={Boolean(payoutBusyId)}
-                    onClick={() => decidePayout(approval.id, 'approve')}
-                  >
-                    <Check size={17} />
-                    {payoutBusyId === String(approval.id) ? 'Memproses...' : 'Konfirmasi'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary min-h-11"
-                    disabled={Boolean(payoutBusyId)}
-                    onClick={() => decidePayout(approval.id, 'reject')}
-                  >
-                    Tolak
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 rounded-xl bg-canvas p-3 text-sm text-muted">
-            Tidak ada permintaan pencairan yang menunggu konfirmasi.
-          </p>
-        )}
-      </section>
     </div>
   );
 }

@@ -57,11 +57,33 @@ import {
   requestCanteenPayoutApproval,
 } from '../services/canteenPayoutApprovals.js';
 import {
+  createAdminIncome,
   createAdminExpense,
   getAdminCash,
   reverseAdminCashEntry,
   setMonthlyServiceFee,
 } from '../Controllers/adminFinanceController.js';
+import {
+  deleteInstitutionLogo,
+  getAdminSettings,
+  parseLogoUpload,
+  updateSettings,
+  uploadInstitutionLogo,
+} from '../Controllers/settingsController.js';
+import {
+  connectWhatsApp,
+  disconnectWhatsApp,
+  getWhatsAppStatus,
+} from '../Controllers/whatsappController.js';
+import {
+  exportFinancialReportCsv,
+  exportFinancialReportPdf,
+  getFinancialReport,
+} from '../Controllers/financialReportController.js';
+import {
+  getAdminMidtransSettings,
+  updateAdminMidtransSettings,
+} from '../Controllers/midtransController.js';
 
 const router = express.Router();
 
@@ -69,6 +91,19 @@ router.use(authenticateToken, authorizeRoles('admin'));
 router.use(auditMutation);
 
 router.get('/dashboard', getDashboard);
+router.get('/reports/financial', getFinancialReport);
+router.get('/reports/financial/export.csv', exportFinancialReportCsv);
+router.get('/reports/financial/export.pdf', exportFinancialReportPdf);
+router.get('/settings', getAdminSettings);
+router.get('/settings/midtrans', getAdminMidtransSettings);
+router.put('/settings/midtrans', updateAdminMidtransSettings);
+router.put('/settings', updateSettings);
+router.patch('/settings', updateSettings);
+router.post('/settings/logo', parseLogoUpload, uploadInstitutionLogo);
+router.delete('/settings/logo', deleteInstitutionLogo);
+router.get('/settings/whatsapp/status', getWhatsAppStatus);
+router.post('/settings/whatsapp/connect', connectWhatsApp);
+router.delete('/settings/whatsapp/disconnect', disconnectWhatsApp);
 router.get('/audit-logs', getAuditLogs);
 router.get('/financial-approvals', getFinancialApprovals);
 router.post('/financial-approvals', requestFinancialApproval);
@@ -78,6 +113,7 @@ router.post('/financial-approvals/:id/reject', rejectFinancialApproval);
 
 router.get('/cash', getAdminCash);
 router.post('/cash/service-fee', setMonthlyServiceFee);
+router.post('/cash/income', createAdminIncome);
 router.post('/cash/expenses', createAdminExpense);
 router.post('/cash/entries/:id/reverse', reverseAdminCashEntry);
 

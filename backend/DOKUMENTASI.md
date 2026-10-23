@@ -24,7 +24,7 @@ Nilai saldo menggunakan `DECIMAL` dan umumnya dikirim sebagai string desimal, mi
 - MySQL client tools `mysql` dan `mysqldump` untuk pemulihan dan backup.
 - Akun MySQL terpisah untuk aplikasi, migrasi, dan backup pada deployment produksi.
 
-Dependency utama adalah Express, `mysql2`, `jsonwebtoken`, `bcryptjs`, dan `dotenv`. Versi dependency terkunci di `package-lock.json`.
+Dependency utama adalah Express, `mysql2`, `jsonwebtoken`, `bcryptjs`, `dotenv`, `multer` untuk unggahan logo, Baileys dan `qrcode` untuk koneksi WhatsApp berbasis QR, serta PDFKit untuk laporan finansial. Midtrans Snap menggunakan HTTPS API bawaan Node.js tanpa menyimpan Server Key di frontend. Versi dependency terkunci di `package-lock.json`.
 
 Untuk instalasi database kosong, gunakan [`sql/install.sql`](./sql/install.sql) dari direktori `backend`; skrip tersebut memasang semua tabel dan trigger yang dipakai aplikasi melalui `users.sql` dan `admin_api.sql`. Langkah deployment VPS lengkap terdapat di [PANDUAN_DEPLOYMENT_VPS.md](../PANDUAN_DEPLOYMENT_VPS.md).
 
@@ -52,7 +52,7 @@ atau:
 npm start
 ```
 
-API berjalan di port `3000` secara default. `GET http://localhost:3000/` memberikan status dan beberapa route utama. Body request mutasi harus JSON (`Content-Type: application/json`); ukuran body dibatasi 32 KB.
+API berjalan di port `3000` secara default. `GET http://localhost:3000/` memberikan status dan beberapa route utama. Body request mutasi harus JSON (`Content-Type: application/json`); ukuran body JSON dibatasi 32 KB. Pengecualian hanya unggahan logo pondok melalui `multipart/form-data`, maksimal 2 MB.
 
 ## 4. Konfigurasi lingkungan
 
@@ -75,6 +75,10 @@ Gunakan `backend/.env.example` sebagai daftar variabel yang tersedia. Simpan nil
 | `BACKUP_DB_USER`, `BACKUP_DB_PASSWORD` | Kredensial khusus backup |
 | `BACKUP_ENCRYPTION_KEY` | Kunci AES-256-GCM backup terpisah dari kunci MFA; 64 karakter hex |
 | `BACKUP_DIR` | Direktori backup terenkripsi |
+| `UPLOAD_DIR` | Direktori persisten untuk logo pondok; default `backend/uploads` |
+| `WHATSAPP_AUTH_DIR` | Direktori privat persisten bernama `whatsapp-auth` untuk sesi perangkat Baileys; default `backend/whatsapp-auth` |
+
+Kredensial Midtrans diatur admin pada halaman **Pengaturan pondok** dan disimpan terenkripsi di database menggunakan `MFA_ENCRYPTION_KEY`. Top-up menggunakan Core API QRIS langsung dan menampilkan kode QR untuk dipindai, bukan halaman kanal Snap. Setiap pesanan menyimpan snapshot kredensial terenkripsi dan lingkungan agar pergantian konfigurasi tidak memutus pembayaran yang sedang berjalan. Sandbox Core API aktif secara default; aktivasi Core API Production harus diminta kepada Midtrans. Atur Payment Notification URL di dashboard Midtrans ke `https://<domain-api>/api/midtrans/notification`; endpoint harus dapat dijangkau publik melalui HTTPS. Wali dapat top-up Rp10.000–Rp450.000 per transaksi, dengan QRIS berlaku 15 menit. Saldo hanya bertambah setelah status settlement diverifikasi.
 
 Pada produksi, backend mewajibkan TLS untuk request, `DB_SSL_CA`, serta `DB_AUTO_MIGRATE=false`. Proxy TLS harus dikonfigurasi dengan benar dan jumlah hop tepercaya harus tepat. Jangan menyalin file `.env` dari satu environment ke environment lain.
 
@@ -92,11 +96,23 @@ Pada produksi, backend mewajibkan TLS untuk request, `DB_SSL_CA`, serta `DB_AUTO
 | `config/security.js` | Validasi kunci, enkripsi secret MFA, serta fungsi TOTP |
 | `config/passwords.js` | Validasi aturan password |
 | `services/financialApprovals.js` | Permintaan, keputusan, masa berlaku, dan konsumsi approval finansial |
+| `services/midtrans.js` | Integrasi Snap/QRIS, validasi signature dan status transaksi Midtrans |
+| `Controllers/midtransController.js` | Pengaturan admin, API top-up wali, webhook, dan pencocokan saldo |
 | `scripts/` | Migrasi skema, provisioning admin, backup, dan restore |
 | `sql/` | SQL pendukung API dan tabel akun |
 | `test/` | Tes keamanan otomatis berbasis `node:test` |
 
-Route utama yang dipasang adalah `/api/auth`, `/api/users`, `/api/admin`, `/api/kantin`, dan `/api/wali`. Semua route role terlindungi memeriksa token dan role di server; pembatasan UI frontend bukan pengganti otorisasi ini.
+Route utama yang dipasang adalah `/api/auth`, `/api/settings`, `/api/users`, `/api/admin`, `/api/kantin`, dan `/api/wali`. Semua route role terlindungi memeriksa token dan role di server; pembatasan UI frontend bukan pengganti otorisasi ini.
+
+Profil pondok disimpan per instalasi pada satu baris `institution_settings`. Endpoint publik hanya menampilkan identitas pondok; perubahan profil dan logo memerlukan akun admin. Nilai awal berupa data contoh dan harus diganti sebelum aplikasi digunakan. Nama aplikasi PWA dan logo pada profil digunakan oleh web app manifest. File logo PNG/JPG/WebP maksimal 2 MB disimpan di `UPLOAD_DIR`; direktori tersebut harus persisten dan dapat ditulis oleh proses backend, serta harus disertakan dalam backup deployment. Instalasi PWA menggunakan HTTPS dan origin frontend/API yang sama; `GET /api/settings/manifest.webmanifest` bersifat publik.
+
+Audit log menyimpan username/aktor, endpoint, metode, kode status, serta detail aksi yang dirangkai dari metadata aman untuk transaksi saldo dan operasi umum. Filter admin mendukung aktor, rentang tanggal inklusif, dan metode aksi. Payload request, kata sandi, token, RFID, serta fingerprint tidak dicatat.
+
+Integrasi notifikasi wali menggunakan Baileys: admin menghubungkan perangkat dari Pengaturan pondok dan memindai QR. Kredensial sesi berada di `WHATSAPP_AUTH_DIR`, harus dijaga aksesnya hanya untuk akun layanan backend, persisten setelah deploy/restart, dan tidak boleh masuk Git atau disajikan sebagai file statis. Sesi yang hilang perlu dipasangkan ulang. Wali sendiri harus mengirim pesan verifikasi dari nomor yang akan menerima notifikasi. Notifikasi belanja, top-up, dan penarikan menggunakan antrean `whatsapp_notification_outbox`; kegagalan kirim dicoba ulang dan tidak membatalkan transaksi.
+
+Baileys adalah library tidak resmi untuk protokol WhatsApp Web, bukan layanan WhatsApp resmi. Koneksi dapat terputus dan akun dapat dibatasi; gunakan nomor khusus bot, patuhi ketentuan WhatsApp, dan kirim hanya notifikasi yang disetujui wali. Data sesi adalah kredensial sensitif; perlakukan sebagai rahasia dan jangan salin ke lingkungan lain.
+
+Migrasi skema mengosongkan token Fonnte lama jika masih tersimpan, menyiapkan kolom kredensial Midtrans dan tabel pesanan QRIS, menambahkan nama aplikasi PWA, serta menambahkan pengaturan katalog dan tabel produk, rincian penjualan, serta pergerakan stok. Untuk instalasi produksi, jalankan `npm run migrate` dengan kredensial migrasi sebelum menjalankan versi backend ini.
 
 ## 6. Migrasi dan provisioning admin
 
@@ -113,7 +129,7 @@ Untuk database kosong yang baru dibuat, jalankan installer SQL terlebih dahulu d
 mysql -u root -p < sql/install.sql
 ```
 
-Installer membuat database `db_cashless_santri`, seluruh tabel operasional, indeks, foreign key, dan trigger append-only. Script migrasi Node menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian memastikan/memperbarui skema. Pada produksi, jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
+Installer membuat database `db_cashless_santri`, seluruh tabel operasional, indeks, foreign key, dan trigger append-only. Script migrasi Node menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian memastikan/memperbarui skema termasuk menambahkan kolom idempotensi yang belum ada pada ledger kas lama. Pada produksi, jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
 
 Provision admin awal sesudah migrasi:
 
@@ -146,8 +162,8 @@ Endpoint API lengkap—termasuk parameter, bentuk body, contoh response, status 
 |---|---|
 | `/api/auth` | Login, enrollment/verifikasi MFA, dan profil sesi |
 | `/api/users` | Administrasi akun oleh admin |
-| `/api/admin` | Dashboard, santri, kantin/kasir, wali, kredensial, transaksi, approval (daftar, detail, keputusan, riwayat), audit |
-| `/api/kantin` | Kantin yang ditugaskan, lookup santri, penjualan, dan riwayat kasir |
+| `/api/admin` | Dashboard, santri, kantin/kasir, wali, kredensial, transaksi dan laporan finansial tanpa rincian produk, approval (daftar, detail, keputusan, riwayat), audit |
+| `/api/kantin` | Kantin yang ditugaskan, lookup santri, katalog/stok yang dikelola kasir, mode nominal atau POS per transaksi, penjualan, dan riwayat kasir |
 | `/api/wali` | Profil wali, anak terhubung, riwayat, dan limit harian |
 
 Sertakan access token pada header autentikasi HTTP dengan skema Bearer. Login admin dan kasir memerlukan MFA TOTP; challenge MFA berlaku 5 menit, sedangkan access token berlaku 1 jam. Token yang kedaluwarsa atau dicabut mengharuskan login kembali. Login dan MFA memiliki rate limit; API juga membatasi request umum.

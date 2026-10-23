@@ -1,5 +1,5 @@
-import { ArrowRight } from 'lucide-react';
-import { Alert, AmountLine, Field, StatusBadge } from '../../ui.jsx';
+import { ArrowRight, Delete } from 'lucide-react';
+import { Alert, AmountLine, Field } from '../../ui.jsx';
 
 export const METHOD_FIELDS = {
   RFID: {
@@ -17,44 +17,50 @@ export const METHOD_FIELDS = {
 };
 
 export function PurchaseForm({ amount, setAmount, description, setDescription, error, onSubmit }) {
+  const addDigits = (digits) => {
+    const next = `${amount || ''}${digits}`.replace(/^0+(?=\d)/, '');
+    setAmount(next);
+  };
+  const removeDigit = () => setAmount((current) => String(current || '').slice(0, -1));
+
   return (
-    <section className="card mt-4 p-4 sm:p-6">
-      <div className="mb-5">
-        <StatusBadge>Langkah 1 dari 3</StatusBadge>
-        <h1 className="mt-3 text-xl font-semibold">Masukkan nominal belanja</h1>
-        <p className="mt-1 text-sm text-muted">
-          Isi total belanja sebelum memindai kredensial santri.
-        </p>
-      </div>
-      <form className="space-y-4" onSubmit={onSubmit}>
-        <label className="block">
-          <span className="label">Nominal belanja (Rp)</span>
-          <input
-            className="field min-h-16 text-2xl font-semibold tabular-nums sm:text-3xl"
-            type="number"
-            inputMode="decimal"
-            min="0.01"
-            step="0.01"
-            placeholder="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-          />
-        </label>
+    <section className="mx-auto mt-4 max-w-[560px]">
+      <form className="space-y-3" onSubmit={onSubmit}>
+        <div className="py-4 text-center sm:py-6">
+          <p className="text-xs text-muted">Nominal belanja</p>
+          <p className="mt-1 text-4xl font-semibold tracking-tight sm:text-5xl">
+            {amount ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(amount)) : 'Rp0'}
+          </p>
+          <p className="mt-2 text-[11px] text-muted">Transaksi terpisah, bukan tambahan keranjang.</p>
+        </div>
         <Field
-          label="Keterangan"
-          placeholder="Contoh: Makan siang"
+          label=""
+          placeholder="Keterangan (contoh: Belanja kantin)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={500}
         />
+        <div className="grid grid-cols-3 gap-2">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'delete'].map((key) => (
+            <button
+              key={key}
+              type="button"
+              className="grid min-h-11 place-items-center rounded-xl border border-line bg-white text-lg font-medium transition hover:bg-pondok-50 active:bg-pondok-100"
+              aria-label={key === 'delete' ? 'Hapus satu angka' : key}
+              onClick={key === 'delete' ? removeDigit : () => addDigits(key)}
+            >
+              {key === 'delete' ? <Delete size={18} /> : key}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] leading-relaxed text-muted">Nominal harus lebih dari Rp0 dan tidak boleh melebihi saldo atau sisa limit harian santri.</p>
         {error && <Alert type="error">{error}</Alert>}
         <button
-          className="btn-primary min-h-12 w-full"
+          className="btn-primary min-h-11 w-full"
           disabled={!Number.isFinite(Number(amount)) || Number(amount) <= 0}
         >
-          <ArrowRight size={18} />
-          Lanjutkan ke kredensial
+          <ArrowRight size={17} />
+          Lanjutkan ke verifikasi
         </button>
       </form>
     </section>

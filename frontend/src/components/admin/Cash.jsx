@@ -24,6 +24,11 @@ export function AdminCash({ token }) {
     amount: '',
     description: '',
   });
+  const [income, setIncome] = useState({
+    category: 'Pemasukan luar',
+    amount: '',
+    description: '',
+  });
   const [correctionReason, setCorrectionReason] = useState('');
   const [cashEntryKey, setCashEntryKey] = useState(() => idempotencyKey());
   const path = `/admin/cash?page=${page}&limit=20`;
@@ -51,6 +56,17 @@ export function AdminCash({ token }) {
       refresh();
     }
   };
+  const submitIncome = async (event) => {
+    event.preventDefault();
+    const result = await mutation.run(() =>
+      api.post('/admin/cash/income', income, token, { idempotencyKey: cashEntryKey }),
+    );
+    if (result) {
+      setIncome({ category: 'Pemasukan luar', amount: '', description: '' });
+      setModal('');
+      refresh();
+    }
+  };
   const submitCorrection = async (event) => {
     event.preventDefault();
     const result = await mutation.run(() =>
@@ -69,7 +85,7 @@ export function AdminCash({ token }) {
   };
   const openModal = (name) => {
     mutation.setError('');
-    if (name === 'expense') setCashEntryKey(idempotencyKey());
+    if (['expense', 'income'].includes(name)) setCashEntryKey(idempotencyKey());
     setModal(name);
   };
 
@@ -77,7 +93,7 @@ export function AdminCash({ token }) {
     <>
       <PageHeader
         title="Kas admin"
-        subtitle="Pantau pemasukan biaya layanan dan catat pengeluaran operasional."
+        subtitle="Pantau biaya layanan, pemasukan luar, dan pengeluaran operasional."
         action={
           <div className="flex flex-wrap gap-2">
             <button
@@ -88,6 +104,9 @@ export function AdminCash({ token }) {
               }}
             >
               Atur biaya layanan
+            </button>
+            <button className="btn-secondary" onClick={() => openModal('income')}>
+              Catat pemasukan
             </button>
             <button className="btn-primary" onClick={() => openModal('expense')}>
               Catat pengeluaran
@@ -106,6 +125,13 @@ export function AdminCash({ token }) {
           detail="Belum tertagih; hangus saat bulan berganti"
         />
       </div>
+
+      {Number(data?.summary?.balance) < 0 && (
+        <Alert type="warning" className="mb-5">
+          Saldo kas admin saat ini negatif akibat catatan sebelumnya. Catat pemasukan luar yang
+          benar untuk menutup kekurangan sebelum membuat pengeluaran baru.
+        </Alert>
+      )}
 
       <section className="card mb-5 flex flex-wrap items-center justify-between gap-4 p-5">
         <div>
@@ -273,6 +299,58 @@ export function AdminCash({ token }) {
               required
             />
           </ActionForm>
+        </Modal>
+      )}
+
+      {modal === 'income' && (
+        <Modal title="Catat pemasukan luar" onClose={() => !mutation.busy && setModal('')}>
+          <div className="space-y-4">
+            <Alert>
+              Gunakan untuk dana yang benar-benar diterima di luar biaya layanan, misalnya sumbangan
+              atau bantuan. Isi sumber dan keterangannya agar tercatat jelas.
+            </Alert>
+            <ActionForm
+              onSubmit={submitIncome}
+              busy={mutation.busy}
+              error={mutation.error}
+              submitLabel="Simpan pemasukan"
+              secondary={
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={mutation.busy}
+                  onClick={() => setModal('')}
+                >
+                  Batal
+                </button>
+              }
+            >
+              <Field
+                label="Sumber pemasukan"
+                value={income.category}
+                onChange={(event) => setIncome({ ...income, category: event.target.value })}
+                maxLength={80}
+                required
+              />
+              <Field
+                label="Nominal"
+                type="number"
+                min="0.01"
+                max="9999999999.99"
+                step="0.01"
+                value={income.amount}
+                onChange={(event) => setIncome({ ...income, amount: event.target.value })}
+                required
+              />
+              <Field
+                label="Keterangan"
+                value={income.description}
+                onChange={(event) => setIncome({ ...income, description: event.target.value })}
+                maxLength={500}
+                required
+              />
+            </ActionForm>
+          </div>
         </Modal>
       )}
 

@@ -7,7 +7,7 @@ Dokumen ini merangkum endpoint yang saat ini tersedia di backend untuk membantu 
 - Base URL lokal: `http://localhost:3000`
 - Semua path di bawah menggunakan prefix `/api`.
 - `GET /` adalah endpoint status tanpa autentikasi; respons berisi `message` dan objek `endpoints` dengan beberapa route utama.
-- Request dengan body harus mengirim `Content-Type: application/json`.
+- Request dengan body harus mengirim `Content-Type: application/json`, kecuali unggahan logo yang memakai `multipart/form-data`.
 - Kecuali endpoint login dan MFA setup/verify, endpoint terlindungi memerlukan `Authorization: Bearer <access_token>`.
 - Endpoint admin hanya untuk role `admin`; kasir hanya dapat mengakses kantin yang ditugaskan kepadanya; wali hanya dapat mengakses santri yang terhubung dengan akun tersebut.
 - Role yang tersedia: `santri`, `kasir`, `wali`, `admin`. API yang terdokumentasi di sini tidak menyediakan endpoint khusus UI santri; autentikasi santri tetap tersedia.
@@ -16,6 +16,36 @@ Dokumen ini merangkum endpoint yang saat ini tersedia di backend untuk membantu 
 - Access token berlaku 1 jam; challenge MFA berlaku 5 menit. Tidak ada endpoint logout khusus; perubahan password, role, atau status akun mencabut sesi aktif.
 - Endpoint daftar yang mendukung pagination menggunakan `?page=1&limit=20`. Nilai default `page=1`, `limit=20`; limit maksimum 100.
 - JSON error umum berbentuk `{"message":"..."}`. Error autentikasi/validasi tertentu juga mengembalikan `approval_required` atau `cashier_approval_required`.
+
+## Profil pondok
+
+Setiap instalasi menyimpan satu profil pondok. Endpoint publik hanya membaca data identitas untuk kebutuhan branding; perubahan memerlukan access token admin dan diaudit.
+
+| Method | Path | Akses | Kegunaan |
+|---|---|---|---|
+| GET | `/api/settings` | Publik | Membaca nama, nama aplikasi PWA, logo, dan zona waktu untuk branding |
+| GET | `/api/settings/manifest.webmanifest` | Publik | Membaca web app manifest dengan nama dan ikon yang dikonfigurasi admin |
+| GET | `/api/admin/settings` | Admin | Membaca seluruh detail profil |
+| PUT / PATCH | `/api/admin/settings` | Admin | Memperbarui profil pondok dengan JSON |
+| POST | `/api/admin/settings/logo` | Admin | Mengunggah logo multipart dengan field `logo`; PNG/JPG/WebP, maksimal 2 MB |
+| DELETE | `/api/admin/settings/logo` | Admin | Menghapus logo yang terpasang |
+| GET | `/api/uploads/:filename` | Publik | Menampilkan logo |
+
+Contoh body untuk menyimpan profil:
+
+```json
+{
+  "name": "Pondok Contoh",
+  "app_name": "PondokPay Al-Hikmah",
+  "address": "Jl. Pendidikan No. 10, Bandung",
+  "phone": "+62 812-0000-0000",
+  "email": "info@pondokcontoh.id",
+  "manager_name": "Nama Pengelola",
+  "timezone": "Asia/Jakarta"
+}
+```
+
+Field `name` wajib diisi; `app_name` opsional (maksimal 80 karakter) dan jika kosong nama aplikasi mengikuti nama pondok. `timezone` harus merupakan zona waktu IANA yang valid (misalnya `Asia/Jakarta`, `Asia/Makassar`, atau `Asia/Jayapura`). Alamat, kontak, email, dan penanggung jawab boleh kosong. Logo disimpan di direktori `UPLOAD_DIR` backend; pastikan direktori tersebut persisten pada deployment.
 
 ## Autentikasi, sesi, dan MFA
 
@@ -135,17 +165,58 @@ PUT/PATCH menerima satu atau beberapa properti `username`, `password`, `role`, `
 
 Semua endpoint `/api/admin` memerlukan access token admin. Endpoint mutasi diaudit sebelum diproses.
 
+### Integrasi WhatsApp wali (Baileys)
+
+Admin menghubungkan perangkat WhatsApp dari halaman Pengaturan pondok dengan QR. Status dan QR hanya dapat diakses admin; kredensial perangkat disimpan pada direktori privat persisten `WHATSAPP_AUTH_DIR`. Tidak ada token Fonnte atau webhook eksternal.
+
+| Method | Path | Akses | Kegunaan |
+|---|---|---|---|
+| GET | `/api/admin/settings/whatsapp/status` | Admin | Melihat status koneksi dan QR sementara untuk pairing |
+| POST | `/api/admin/settings/whatsapp/connect` | Admin | Memulai koneksi/pairing Baileys |
+| DELETE | `/api/admin/settings/whatsapp/disconnect` | Admin | Keluar dari perangkat tertaut dan menghapus sesi lokal |
+| GET | `/api/wali/notifikasi/whatsapp` | Wali | Melihat nomor dan status verifikasi |
+| POST | `/api/wali/notifikasi/whatsapp/verifikasi` | Wali | Memulai opt-in dengan `{ "phone": "081234567890" }` |
+| DELETE | `/api/wali/notifikasi/whatsapp` | Wali | Menonaktifkan notifikasi dan menghapus nomor tersimpan |
+
+Permintaan verifikasi mengembalikan tautan `wa.me` dengan pesan kode acak sekali pakai, berlaku 10 menit. Wali harus membuka tautan dan secara manual menekan kirim dari nomor yang hendak diverifikasi; sistem tidak memulai chat atau mengirim pesan promosi. Bot hanya menerima kode valid untuk nomor yang sama, sekali pakai. Setelah terverifikasi, wali menerima notifikasi WhatsApp untuk transaksi belanja, top-up, dan penarikan anak yang terhubung.
+
+Notifikasi transaksi dimasukkan ke antrean database dalam transaksi saldo yang sama. Worker mengirimnya terpisah dari request kasir/admin, lalu mencoba ulang kegagalan sementara sampai lima kali. Kegagalan layanan WhatsApp tidak membatalkan transaksi saldo. Jika koneksi terputus setelah pesan terkirim tetapi sebelum aplikasi menerima konfirmasi, pengiriman ulang mungkin menghasilkan duplikat.
+
+Verifikasi berbasis pesan masuk merupakan langkah persetujuan dan mengurangi pesan yang tidak diminta, tetapi tidak menjamin akun/perangkat bebas pembatasan WhatsApp. Baileys adalah integrasi WhatsApp Web tidak resmi dan tidak didukung WhatsApp; gunakan nomor khusus bot, patuhi ketentuan WhatsApp, kirim hanya notifikasi yang disetujui, dan nonaktifkan nomor bila wali meminta berhenti.
+
+### Top-up digital QRIS (Midtrans)
+
+| Method | Path | Akses | Kegunaan |
+|---|---|---|---|
+| GET | `/api/admin/settings/midtrans` | Admin | Melihat Merchant ID, Client Key, lingkungan, dan status konfigurasi tanpa membuka Server Key |
+| PUT | `/api/admin/settings/midtrans` | Admin | Menyimpan `merchant_id`, `client_key`, `server_key`, dan `environment` (`sandbox` atau `production`) |
+| GET | `/api/wali/topup/config` | Wali | Membaca status pembayaran, Client Key publik, serta batas nominal dan masa berlaku |
+| POST | `/api/wali/topup` | Wali | Membuat transaksi QRIS melalui Midtrans Core API |
+| GET | `/api/wali/topup/history` | Wali | Melihat hingga 20 pembayaran terbaru milik akun tersebut |
+| GET | `/api/wali/topup/:orderId` | Wali pemilik transaksi | Melihat status dan memeriksa ulang pembayaran |
+| POST | `/api/midtrans/notification` | Midtrans, endpoint publik | Memverifikasi notifikasi dan memperbarui ledger secara idempoten |
+
+Permintaan wali mengirim header `Idempotency-Key` unik (8–64 karakter) dan body `{ "santri_id": 12, "amount": 50000 }`. Nilai top-up harus bilangan Rupiah bulat Rp10.000–Rp450.000 dan santri harus terhubung dengan akun wali. `POST` membuat pembayaran dengan `payment_type: "qris"` melalui Core API `/v2/charge` dan mengembalikan `qr_data_url` untuk ditampilkan sebagai gambar, `qr_string` sebagai payload QRIS mentah, serta `qr_code_url` dari action Midtrans `generate-qr-code`. Untuk simulator Midtrans yang meminta **QR Code Image Url**, tempel nilai `qr_code_url`—bukan `qr_string` maupun data URL gambar. Wali dapat memindai kode yang ditampilkan dengan aplikasi pembayaran yang mendukung QRIS. Masa berlaku transaksi QRIS disetel 15 menit. Biaya pemrosesan QRIS ditanggung pondok. Setelah status settlement terverifikasi, saldo dan transaksi ledger dicatat atomik satu kali; aturan biaya layanan bulanan yang sudah ada tetap berlaku.
+
+Sandbox Core API aktif secara default menurut dokumentasi Midtrans. Aktivasi Core API pada Production perlu diminta ke Midtrans, dan metode QRIS harus diaktifkan pada akun merchant terkait. Kredensial yang sama tetap harus dipakai pada seluruh top-up.
+
+Set Server Key dienkripsi dengan `MFA_ENCRYPTION_KEY` sebelum disimpan. API tidak pernah mengembalikan Server Key. Validasi format menerima prefix key Midtrans baru (`Mid-client-` dan `Mid-server-`) maupun prefix Sandbox lama (`SB-Mid-client-` dan `SB-Mid-server-`); pilihan Sandbox/Production tetap menentukan host API yang digunakan. Kredensial terenkripsi dan lingkungan yang dipakai disimpan sebagai snapshot tiap order agar penggantian konfigurasi admin tidak memutus pembayaran yang sedang berjalan. Server memverifikasi `signature_key` SHA-512 dan mengambil status terbaru langsung dari API Midtrans sebelum perubahan saldo. Status pending, paid, expired, dan failed tersedia bagi wali. Setiap order hanya bisa mengkredit satu kali.
+
+Daftarkan `https://<domain-api>/api/midtrans/notification` sebagai Payment Notification URL di dashboard Midtrans untuk lingkungan yang dipilih. Endpoint webhook harus dapat dijangkau dari internet publik; jangan gunakan `localhost` pada pembayaran sandbox tanpa tunnel publik. Sandbox dan production menggunakan Merchant ID, Client Key, Server Key, serta URL dashboard yang berbeda. Untuk instalasi produksi, jalankan migrasi database sebelum deploy API yang menggunakan tabel pembayaran baru.
+
 ### Dashboard, audit, dan persetujuan finansial
 
 | Method | Path | Request/query |
 |---|---|---|
 | GET | `/api/admin/dashboard` | — |
-| GET | `/api/admin/audit-logs?page=1&limit=50` | `page`, `limit` |
+| GET | `/api/admin/audit-logs?page=1&limit=50&actor_user_id=12&from=2026-10-01&to=2026-10-31&method=POST` | `page`, `limit`, `actor_user_id`, `from`, `to`, `method` |
 | GET | `/api/admin/financial-approvals?scope=inbox&page=1&limit=20` | Daftar permintaan; `scope`: `inbox`, `mine`, `history`, `all`; `status` opsional |
 | GET | `/api/admin/financial-approvals/:id` | Detail permintaan |
 | POST | `/api/admin/financial-approvals` | Buat permintaan approval |
 | POST | `/api/admin/financial-approvals/:id/approve` | Admin kedua menyetujui |
 | POST | `/api/admin/financial-approvals/:id/reject` | Admin kedua menolak |
+
+Audit log menampilkan username dan role aktor, deskripsi aktivitas, endpoint, waktu, IP sumber, dan status HTTP. Filter tanggal bersifat inklusif untuk tanggal awal dan akhir. Deskripsi aksi menggunakan metadata terbatas; payload request, password, token, RFID, dan fingerprint tidak dicatat.
 
 Dashboard:
 
@@ -301,14 +372,17 @@ Fingerprint response memakai `fingerprint_id` alih-alih `rfid_uid`. Nilai ini ha
 |---|---|---|
 | GET | `/api/admin/cash?page=1&limit=20` | Ringkasan kas, tarif aktif/terjadwal, utang biaya bulan berjalan, dan riwayat |
 | POST | `/api/admin/cash/service-fee` | Atur tarif seragam per santri; berlaku tanggal 1 bulan berikutnya |
-| POST | `/api/admin/cash/expenses` | Catat pengeluaran dengan `category`, `amount`, `description` dan `Idempotency-Key` |
+| POST | `/api/admin/cash/income` | Catat pemasukan luar biaya layanan dengan `category` (sumber), `amount`, `description`, dan `Idempotency-Key` |
+| POST | `/api/admin/cash/expenses` | Catat pengeluaran dengan `category`, `amount`, `description` dan `Idempotency-Key`; ditolak dengan `409` jika saldo tidak mencukupi |
 | POST | `/api/admin/cash/entries/:id/reverse` | Buat pembalik penuh untuk catatan yang keliru; wajib `reason` dan `Idempotency-Key` |
 
 Pengaturan tarif menerima `{ "amount": 5000 }`; nilai `0` menonaktifkan tagihan mulai periode berikutnya. Job bulanan pada tanggal 1 pukul 00:15 WIB menagih santri aktif. Jika saldo mencukupi, sistem membuat transaksi `biaya_layanan` dan pemasukan kas secara atomik; jika tidak, tagihan berstatus belum tertagih. Top-up pada bulan yang sama akan melunasi tagihan hanya jika saldo setelah top-up mencukupi seluruh tunggakan bulan berjalan. Tunggakan yang belum lunas hangus ketika periode bulan berikutnya diproses. Pengulangan job aman/idempoten.
 
-Pemasukan kas hanya dicatat ketika biaya benar-benar tertagih, bukan saat tagihan dibuat. Pengeluaran dan biaya tertagih disimpan append-only; koreksi membuat catatan pembalik senilai penuh dan catatan asli tetap terlihat. Saldo kas adalah pemasukan dikurangi pengeluaran dan koreksi.
+Pemasukan kas biaya layanan hanya dicatat ketika biaya benar-benar tertagih, bukan saat tagihan dibuat. Pemasukan lain yang benar-benar diterima dapat dicatat melalui `/cash/income` dengan sumber dan keterangan yang jelas. Pengeluaran manual dan koreksi yang mengurangi saldo ditolak bila saldo kas tidak mencukupi; pemeriksaan saldo diserialisasi agar pengeluaran serentak tidak dapat membuat saldo negatif. Pengeluaran, pemasukan manual, dan biaya tertagih disimpan append-only; koreksi membuat catatan pembalik senilai penuh dan catatan asli tetap terlihat. Saldo kas adalah pemasukan dikurangi pengeluaran dan koreksi.
 
 ### Kantin dan penugasan kasir
+
+Dokumentasi khusus API kantin yang dilengkapi contoh request/response JSON dan alur UI tersedia di [API_KANTIN.md](./API_KANTIN.md).
 
 | Method | Path | Kegunaan |
 |---|---|---|
@@ -326,11 +400,13 @@ Pemasukan kas hanya dicatat ketika biaya benar-benar tertagih, bukan saat tagiha
 | POST | `/api/admin/kantin/:id/pencairan` | Cairkan saldo kantin |
 | GET | `/api/admin/kantin/:id/transaksi` | Riwayat penjualan/pencairan |
 
-Objek kantin: `id`, `nama`, `lokasi`, `status` (`active`/`inactive`), `saldo`, `created_at`. POST membuat kantin menggunakan `nama` wajib; `lokasi` opsional; `status` default `active`. Respons list memakai `{ "data": [...] }`, detail memakai `{ "data": {...} }`. DELETE menonaktifkan kantin dan mempertahankan saldo/riwayat.
+Objek kantin pada API admin: `id`, `nama`, `lokasi`, `status` (`active`/`inactive`), `saldo`, `created_at`. Pengelolaan katalog dan stok tidak tersedia untuk admin. Admin tetap dapat mencatat penjualan nominal manual; ringkasan transaksi admin tidak menyertakan rincian produk.
 
 Kasir terdaftar dalam daftar dengan `{ "id": 12, "username": "kasir_1", "created_at": "..." }`. Penugasan berhasil merespons `{ "message": "...", "data": { "kantin_id": 4, "user_id": 12 } }`.
 
-Penjualan admin memakai body `{ "santri_id": 10, "jumlah": 12000, "keterangan": "Belanja" }`. Setiap pencairan wajib diajukan oleh admin melalui endpoint persetujuan kasir. Kasir aktif yang ditugaskan mengonfirmasi dari sesi kasirnya sendiri; login kasir mewajibkan MFA. Setelah status konfirmasi `approved`, admin peminta menjalankan pencairan dengan `{ "jumlah": 10000, "keterangan": "Pencairan hasil penjualan", "cashier_approval_id": 21 }`. Jumlah dan keterangan harus sama persis dengan permintaan. Pencairan di atas ambang juga tetap memerlukan `approval_id` persetujuan admin kedua. Keduanya memerlukan `Idempotency-Key`.
+Penjualan admin memakai body `{ "santri_id": 10, "jumlah": 12000, "keterangan": "Belanja" }` dan hanya mencatat nominal. Header `Idempotency-Key` wajib. Admin tidak menerima atau melihat rincian produk. Kasir yang ditugaskan dapat memilih mode pencatatan nominal atau POS katalog di halaman transaksi bila katalog kantin diaktifkan. Untuk mode POS, kasir mengambil produk melalui `GET /api/kantin/:id/produk` dan mengirim `{ "santri_id": 10, "items": [{ "product_id": 2, "quantity": 2 }], "jumlah": 12000, "keterangan": "Pembelian katalog" }`; server menghitung total dari harga terkini, membandingkan jumlah tampilan, mengunci dan memeriksa stok, lalu menyimpan rincian item serta mutasi stok bersama debit saldo dalam satu transaksi database. Jika harga berubah atau stok tidak cukup, transaksi ditolak dengan `409` tanpa debit saldo maupun perubahan stok. Rincian hanya tersedia di area kasir; laporan dan riwayat admin tetap merangkum nominal transaksi.
+
+Setiap pencairan wajib diajukan oleh admin melalui endpoint persetujuan kasir. Kasir aktif yang ditugaskan mengonfirmasi dari sesi kasirnya sendiri; login kasir mewajibkan MFA. Setelah status konfirmasi `approved`, admin peminta menjalankan pencairan dengan `{ "jumlah": 10000, "keterangan": "Pencairan hasil penjualan", "cashier_approval_id": 21 }`. Jumlah dan keterangan harus sama persis dengan permintaan. Pencairan di atas ambang juga tetap memerlukan `approval_id` persetujuan admin kedua. Keduanya memerlukan `Idempotency-Key`.
 
 ```json
 {
@@ -351,10 +427,15 @@ Permintaan konfirmasi kasir berlaku 24 jam dan hanya dapat diputuskan sekali ole
 |---|---|---|
 | GET | `/api/admin/transaksi?page=1&limit=20` | `santri_id`, `tipe_transaksi` opsional |
 | GET | `/api/admin/kantin/:id/transaksi?page=1&limit=20` | `tipe_transaksi=penjualan` atau `pencairan` |
+| GET | `/api/admin/reports/financial` | `start_date`, `end_date` wajib; `santri_id`, `kantin_id` opsional |
+| GET | `/api/admin/reports/financial/export.csv` | Filter periode dan santri/kantin yang sama; unduhan CSV UTF-8 |
+| GET | `/api/admin/reports/financial/export.pdf` | Filter periode dan santri/kantin yang sama; unduhan PDF |
 
 `GET /api/admin/transaksi` menerima tipe `belanja`, `topup`, `tarik`, atau `biaya_layanan`. Entri transaksi admin berisi `id`, `santri_id`, `kantin_id`, `nama_kantin`, `nis`, `nama_lengkap`, `tipe_transaksi`, `jumlah`, `saldo_akhir`, `keterangan`, `created_at`.
 
-Riwayat kantin mengembalikan `{ "data": [...], "pagination": {...} }`; entri memiliki `id`, `kantin_id`, `transaksi_id`, `tipe_transaksi`, `jumlah`, `saldo_akhir`, `keterangan`, `created_at`, `santri_id`, `nis`, `nama_lengkap`. Untuk transaksi pencairan, kolom terkait santri dapat bernilai `null`.
+Riwayat admin kantin mengembalikan `{ "data": [...], "pagination": {...} }`; entri memuat `id`, `kantin_id`, `transaksi_id`, `tipe_transaksi`, `jumlah`, `saldo_akhir`, `keterangan`, `created_at`, `santri_id`, `nis`, dan `nama_lengkap`, tanpa rincian produk. Untuk transaksi pencairan, kolom terkait santri dapat bernilai `null`. Riwayat kasir dapat menyertakan array `items` dengan snapshot nama/harga, kuantitas, dan subtotal produk.
+
+Laporan finansial menerima tanggal `YYYY-MM-DD` dengan rentang inklusif maksimal 366 hari. Respons JSON membungkus `period`, filter aktif, `summary`, rekap `students`, rekap belanja `canteens`, serta tren `spending_trend` harian (termasuk hari tanpa transaksi dengan total nol). Filter `santri_id` dan `kantin_id` dapat dipakai sendiri atau bersama-sama. CSV berisi seluruh bagian laporan dan menggunakan BOM UTF-8; PDF memuat ringkasan serta tabel yang dapat berlanjut ke halaman berikutnya. Endpoint ekspor mengirim file unduhan dengan nama yang mencakup tanggal laporan.
 
 ### Data wali-santri dan akun orang tua
 
@@ -426,6 +507,11 @@ Semua endpoint `/api/kantin` memerlukan token role `kasir` dengan MFA aktif. Aks
 | GET | `/api/kantin` | Kantin aktif yang ditugaskan |
 | GET | `/api/kantin/:id` | Detail dan saldo |
 | GET | `/api/kantin/:id/saldo` | Detail dan saldo (alias) |
+| PATCH | `/api/kantin/:id/katalog` | Mengaktifkan/menonaktifkan katalog: `{ "catalog_enabled": true }` |
+| GET | `/api/kantin/:id/produk` | Daftar produk yang ditugaskan pada kantin, termasuk produk nonaktif untuk pengelolaan |
+| POST | `/api/kantin/:id/produk` | Tambah produk, harga, stok, SKU/barcode opsional |
+| PATCH | `/api/kantin/:id/produk/:productId` | Ubah produk, harga, status, atau stok |
+| GET | `/api/kantin/:id/pergerakan-stok` | Riwayat 100 pergerakan stok terakhir |
 | GET | `/api/kantin/pencairan/persetujuan` | Permintaan pencairan untuk kantin yang ditugaskan |
 | POST | `/api/kantin/pencairan/persetujuan/:id/approve` | Konfirmasi pencairan |
 | POST | `/api/kantin/pencairan/persetujuan/:id/reject` | Tolak permintaan pencairan |
@@ -450,7 +536,9 @@ Lookup harus mengirim tepat satu dari `rfid_uid`, `fingerprint_id`, atau `nis`. 
 }
 ```
 
-Penjualan menggunakan body dan output yang sama dengan penjualan admin. Header `Idempotency-Key` wajib; gunakan key unik untuk transaksi baru dan key/body yang sama hanya untuk retry transaksi yang hasilnya belum diterima. Respons riwayat memakai `data` dan `pagination` sebagaimana bagian transaksi admin; filter opsional `tipe_transaksi=penjualan|pencairan`.
+Katalog produk dan stok sepenuhnya dikelola kasir yang ditugaskan. Produk memakai `nama`, `kategori` (default `Umum`), `harga` (> 0), `stok`, `stok_minimum`, `sku`, `barcode`, dan `is_active`. SKU/barcode opsional tetapi harus unik di dalam kantin. Produk dinonaktifkan melalui `PATCH` dengan `{ "is_active": false }`; penyesuaian stok dicatat sebagai pergerakan stok. Kasir dapat memakai pencatatan nominal atau POS produk pada setiap transaksi saat katalog aktif. Scanner USB/Bluetooth yang bertindak sebagai keyboard dapat digunakan pada kolom pencarian: pindai SKU/barcode lalu tekan Enter. Stok dikurangi hanya jika checkout berhasil.
+
+Penjualan memakai body dan output dasar yang sama dengan penjualan admin. Untuk POS, kirim `items` beserta `jumlah`; total akan dihitung kembali dari harga produk saat ini. Jika harga berubah atau stok tidak cukup, transaksi ditolak dengan `409` tanpa debit saldo atau perubahan stok. Header `Idempotency-Key` wajib; gunakan key unik untuk transaksi baru dan key/body yang sama hanya untuk retry transaksi yang hasilnya belum diterima. Riwayat kasir dapat menyertakan rincian produk, sedangkan riwayat dan laporan admin hanya menampilkan jumlah serta total transaksi. Respons riwayat memakai `data` dan `pagination` sebagaimana bagian transaksi admin; filter opsional `tipe_transaksi=penjualan|pencairan`.
 
 ## API orang tua/wali
 

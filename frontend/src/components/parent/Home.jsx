@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Check, SlidersHorizontal, Wallet } from 'lucide-react';
+import { ArrowRight, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useApiData } from '../../hooks.js';
 import {
   Alert,
@@ -45,6 +45,10 @@ export function ParentHome({ token }) {
   const openHistory = () => {
     if (child) sessionStorage.setItem('pondokpay.selected_child', String(child.id));
     navigate('/wali/history');
+  };
+  const openTopup = () => {
+    if (child) sessionStorage.setItem('pondokpay.selected_child', String(child.id));
+    navigate('/wali/topup');
   };
 
   if (loading) return <MobileLoading />;
@@ -206,9 +210,9 @@ export function ParentHome({ token }) {
                   </div>
                 )}
               </section>
-              <p className="text-center text-[10px] text-muted">
-                Top up saldo dapat dilakukan melalui admin pondok.
-              </p>
+              <button className="btn-primary w-full justify-center" type="button" onClick={openTopup}>
+                <Wallet size={17} />Top-up saldo via QRIS
+              </button>
             </>
           )}
         </>

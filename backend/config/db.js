@@ -68,8 +68,78 @@ export const ensureAdminSchema = async () => {
       nama VARCHAR(100) NOT NULL,
       lokasi VARCHAR(255) DEFAULT NULL,
       status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+      catalog_enabled BOOLEAN NOT NULL DEFAULT FALSE,
       saldo DECIMAL(12,2) NOT NULL DEFAULT 0.00,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  const [catalogEnabledColumn] = await pool.query(
+    `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kantin' AND COLUMN_NAME = 'catalog_enabled'`
+  );
+  if (!catalogEnabledColumn.length) {
+    await pool.query('ALTER TABLE kantin ADD COLUMN catalog_enabled BOOLEAN NOT NULL DEFAULT FALSE');
+  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS institution_settings (
+      id TINYINT UNSIGNED PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      address VARCHAR(255) DEFAULT NULL,
+      phone VARCHAR(30) DEFAULT NULL,
+      email VARCHAR(254) DEFAULT NULL,
+      manager_name VARCHAR(100) DEFAULT NULL,
+      logo_path VARCHAR(255) DEFAULT NULL,
+      app_name VARCHAR(80) DEFAULT NULL,
+      timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Jakarta',
+      midtrans_merchant_id VARCHAR(100) DEFAULT NULL,
+      midtrans_client_key VARCHAR(255) DEFAULT NULL,
+      midtrans_server_key_enc TEXT DEFAULT NULL,
+      midtrans_environment ENUM('sandbox', 'production') NOT NULL DEFAULT 'sandbox'
+    )
+  `);
+  for (const column of [
+    { name: 'app_name', definition: 'VARCHAR(80) DEFAULT NULL' },
+    { name: 'midtrans_merchant_id', definition: 'VARCHAR(100) DEFAULT NULL' },
+    { name: 'midtrans_client_key', definition: 'VARCHAR(255) DEFAULT NULL' },
+    { name: 'midtrans_server_key_enc', definition: 'TEXT DEFAULT NULL' },
+    { name: 'midtrans_environment', definition: "ENUM('sandbox', 'production') NOT NULL DEFAULT 'sandbox'" },
+  ]) {
+    const [existing] = await pool.query(
+      `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'institution_settings' AND COLUMN_NAME = ?`,
+      [column.name]
+    );
+    if (!existing.length) {
+      await pool.query(`ALTER TABLE institution_settings ADD COLUMN ${column.name} ${column.definition}`);
+    }
+  }
+  const [legacyWhatsAppColumns] = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'institution_settings'
+       AND COLUMN_NAME IN ('fonnte_token_enc', 'fonnte_webhook_secret_hash')`
+  );
+  if (legacyWhatsAppColumns.length) {
+    const resetColumns = legacyWhatsAppColumns
+      .map(({ COLUMN_NAME }) => `\`${COLUMN_NAME}\` = NULL`)
+      .join(', ');
+    await pool.query(`UPDATE institution_settings SET ${resetColumns}`);
+  }
+  await pool.query(
+    `INSERT IGNORE INTO institution_settings
+       (id, name, address, phone, email, manager_name, timezone)
+     VALUES (1, 'Nama Pondok', 'Jl. Contoh No. 123, Kabupaten/Kota',
+       '+62 812-0000-0000', 'info@contoh.ponpes.id', 'Nama Penanggung Jawab', 'Asia/Jakarta')`
+  );
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS parent_notification_settings (
+      user_id INT PRIMARY KEY,
+      whatsapp_number VARCHAR(16) NOT NULL,
+      verification_code_hash CHAR(64) DEFAULT NULL,
+      verification_expires_at DATETIME DEFAULT NULL,
+      verified_at DATETIME DEFAULT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_parent_notification_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE
     )
   `);
   await pool.query(`
@@ -115,6 +185,26 @@ export const ensureAdminSchema = async () => {
       FOREIGN KEY (santri_id) REFERENCES santri(id) ON DELETE CASCADE,
       CONSTRAINT fk_transaksi_creator FOREIGN KEY (created_by)
         REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_notification_outbox (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      transaction_id BIGINT NOT NULL,
+      user_id INT NOT NULL,
+      status ENUM('pending', 'processing', 'sent', 'failed') NOT NULL DEFAULT 'pending',
+      attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      processing_at DATETIME DEFAULT NULL,
+      sent_at DATETIME DEFAULT NULL,
+      last_error VARCHAR(255) DEFAULT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_whatsapp_notification_transaction_user (transaction_id, user_id),
+      INDEX idx_whatsapp_notification_queue (status, next_attempt_at),
+      CONSTRAINT fk_whatsapp_notification_transaction FOREIGN KEY (transaction_id)
+        REFERENCES transaksi(id) ON DELETE CASCADE,
+      CONSTRAINT fk_whatsapp_notification_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE
     )
   `);
   await pool.query(`
@@ -193,6 +283,67 @@ export const ensureAdminSchema = async () => {
         FOREIGN KEY (kantin_id) REFERENCES kantin(id) ON DELETE CASCADE,
       CONSTRAINT fk_kantin_kasir_user
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS canteen_products (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      kantin_id INT NOT NULL,
+      nama VARCHAR(120) NOT NULL,
+      kategori VARCHAR(80) NOT NULL DEFAULT 'Umum',
+      sku VARCHAR(40) DEFAULT NULL,
+      barcode VARCHAR(80) DEFAULT NULL,
+      harga DECIMAL(10,2) NOT NULL,
+      stok INT UNSIGNED NOT NULL DEFAULT 0,
+      stok_minimum INT UNSIGNED NOT NULL DEFAULT 5,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_canteen_product_sku (kantin_id, sku),
+      UNIQUE KEY uq_canteen_product_barcode (kantin_id, barcode),
+      INDEX idx_canteen_product_catalog (kantin_id, is_active, kategori, nama),
+      CONSTRAINT fk_canteen_product_kantin FOREIGN KEY (kantin_id)
+        REFERENCES kantin(id) ON DELETE RESTRICT
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS canteen_sale_items (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      transaksi_id BIGINT NOT NULL,
+      product_id INT NOT NULL,
+      nama_produk VARCHAR(120) NOT NULL,
+      sku VARCHAR(40) DEFAULT NULL,
+      harga_satuan DECIMAL(10,2) NOT NULL,
+      quantity INT UNSIGNED NOT NULL,
+      subtotal DECIMAL(12,2) NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_canteen_sale_items_transaction (transaksi_id),
+      INDEX idx_canteen_sale_items_product (product_id),
+      CONSTRAINT fk_canteen_sale_item_transaction FOREIGN KEY (transaksi_id)
+        REFERENCES transaksi(id) ON DELETE RESTRICT,
+      CONSTRAINT fk_canteen_sale_item_product FOREIGN KEY (product_id)
+        REFERENCES canteen_products(id) ON DELETE RESTRICT
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS canteen_stock_movements (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      product_id INT NOT NULL,
+      transaksi_id BIGINT DEFAULT NULL,
+      user_id INT DEFAULT NULL,
+      movement_type ENUM('adjustment', 'sale') NOT NULL,
+      quantity_change INT NOT NULL,
+      stock_after INT UNSIGNED NOT NULL,
+      note VARCHAR(255) DEFAULT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_canteen_stock_product_created (product_id, created_at),
+      INDEX idx_canteen_stock_transaction (transaksi_id),
+      CONSTRAINT fk_canteen_stock_product FOREIGN KEY (product_id)
+        REFERENCES canteen_products(id) ON DELETE RESTRICT,
+      CONSTRAINT fk_canteen_stock_transaction FOREIGN KEY (transaksi_id)
+        REFERENCES transaksi(id) ON DELETE RESTRICT,
+      CONSTRAINT fk_canteen_stock_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE SET NULL
     )
   `);
   await pool.query(`
@@ -339,6 +490,7 @@ export const ensureAdminSchema = async () => {
       actor_user_id INT DEFAULT NULL,
       action VARCHAR(10) NOT NULL,
       resource VARCHAR(255) NOT NULL,
+      details VARCHAR(500) DEFAULT NULL,
       source_ip VARCHAR(45) DEFAULT NULL,
       user_agent VARCHAR(255) DEFAULT NULL,
       status_code SMALLINT DEFAULT NULL,
@@ -349,20 +501,33 @@ export const ensureAdminSchema = async () => {
         REFERENCES users(id) ON DELETE SET NULL
     )
   `);
+  const [auditDetailsColumn] = await pool.query(
+    `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs' AND COLUMN_NAME = 'details'`
+  );
+  if (!auditDetailsColumn.length) {
+    await pool.query('ALTER TABLE audit_logs ADD COLUMN details VARCHAR(500) DEFAULT NULL AFTER resource');
+  }
   for (const triggerName of ['trg_audit_logs_no_delete', 'trg_audit_logs_protect_update']) {
-    const [trigger] = await pool.query(
-      `SELECT 1 FROM INFORMATION_SCHEMA.TRIGGERS
+    const [triggers] = await pool.query(
+      `SELECT ACTION_STATEMENT FROM INFORMATION_SCHEMA.TRIGGERS
        WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = ?`,
       [triggerName]
     );
-    if (!trigger.length && triggerName.endsWith('no_delete')) {
+    const triggerNeedsUpdate = triggerName.endsWith('protect_update') &&
+      triggers.length &&
+      !String(triggers[0].ACTION_STATEMENT).includes('NEW.details');
+    if (triggerNeedsUpdate) {
+      await pool.query(`DROP TRIGGER ${triggerName}`);
+    }
+    if ((!triggers.length || triggerNeedsUpdate) && triggerName.endsWith('no_delete')) {
       await pool.query(
         `CREATE TRIGGER ${triggerName} BEFORE DELETE ON audit_logs
          FOR EACH ROW SIGNAL SQLSTATE '45000'
          SET MESSAGE_TEXT = 'Audit log rows are immutable'`
       );
     }
-    if (!trigger.length && triggerName.endsWith('protect_update')) {
+    if ((!triggers.length || triggerNeedsUpdate) && triggerName.endsWith('protect_update')) {
       await pool.query(
         `CREATE TRIGGER ${triggerName} BEFORE UPDATE ON audit_logs
          FOR EACH ROW
@@ -371,6 +536,7 @@ export const ensureAdminSchema = async () => {
              OR NOT (NEW.actor_user_id <=> OLD.actor_user_id)
              OR NOT (NEW.action <=> OLD.action)
              OR NOT (NEW.resource <=> OLD.resource)
+             OR NOT (NEW.details <=> OLD.details)
              OR NOT (NEW.source_ip <=> OLD.source_ip)
              OR NOT (NEW.user_agent <=> OLD.user_agent)
              OR NOT (NEW.created_at <=> OLD.created_at)
@@ -508,6 +674,34 @@ export const ensureAdminSchema = async () => {
         REFERENCES santri(id) ON DELETE RESTRICT
     )
   `);
+  let serviceFeeChargeSchemaChanged = false;
+  const [forgivenAtColumn] = await pool.query(
+    `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'service_fee_charges'
+       AND COLUMN_NAME = 'forgiven_at'`
+  );
+  if (!forgivenAtColumn.length) {
+    await pool.query(
+      'ALTER TABLE service_fee_charges ADD COLUMN forgiven_at TIMESTAMP DEFAULT NULL AFTER paid_at'
+    );
+    serviceFeeChargeSchemaChanged = true;
+  }
+  const [serviceFeeStatusColumn] = await pool.query(
+    `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'service_fee_charges'
+       AND COLUMN_NAME = 'status'`
+  );
+  if (serviceFeeStatusColumn.length &&
+      !serviceFeeStatusColumn[0].COLUMN_TYPE.includes("'forgiven'")) {
+    await pool.query(
+      `ALTER TABLE service_fee_charges MODIFY status
+       ENUM('unpaid', 'paid', 'forgiven') NOT NULL DEFAULT 'unpaid'`
+    );
+    serviceFeeChargeSchemaChanged = true;
+  }
+  if (serviceFeeChargeSchemaChanged) {
+    await pool.query('DROP TRIGGER IF EXISTS trg_service_fee_charge_protect_update');
+  }
   const [serviceFeeTrigger] = await pool.query(
     `SELECT 1 FROM INFORMATION_SCHEMA.TRIGGERS
      WHERE TRIGGER_SCHEMA = DATABASE()
@@ -560,10 +754,11 @@ export const ensureAdminSchema = async () => {
       description VARCHAR(500) NOT NULL,
       service_fee_charge_id BIGINT DEFAULT NULL UNIQUE,
       reverses_entry_id BIGINT DEFAULT NULL UNIQUE,
-      idempotency_key VARCHAR(64) DEFAULT NULL UNIQUE,
+      idempotency_key VARCHAR(64) DEFAULT NULL,
       created_by INT DEFAULT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_admin_cash_created (created_at, id),
+      UNIQUE KEY uq_admin_cash_idempotency_key (idempotency_key),
       CONSTRAINT fk_admin_cash_fee_charge FOREIGN KEY (service_fee_charge_id)
         REFERENCES service_fee_charges(id) ON DELETE RESTRICT,
       CONSTRAINT fk_admin_cash_reversal FOREIGN KEY (reverses_entry_id)
@@ -572,6 +767,26 @@ export const ensureAdminSchema = async () => {
         REFERENCES users(id) ON DELETE SET NULL
     )
   `);
+  const [adminCashIdempotencyColumn] = await pool.query(
+    `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_cash_entries'
+       AND COLUMN_NAME = 'idempotency_key'`
+  );
+  if (!adminCashIdempotencyColumn.length) {
+    await pool.query(
+      'ALTER TABLE admin_cash_entries ADD COLUMN idempotency_key VARCHAR(64) DEFAULT NULL'
+    );
+  }
+  const [adminCashIdempotencyIndex] = await pool.query(
+    `SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_cash_entries'
+       AND COLUMN_NAME = 'idempotency_key' AND NON_UNIQUE = 0`
+  );
+  if (!adminCashIdempotencyIndex.length) {
+    await pool.query(
+      'CREATE UNIQUE INDEX uq_admin_cash_idempotency_key ON admin_cash_entries (idempotency_key)'
+    );
+  }
   for (const [triggerName, event] of [
     ['trg_admin_cash_no_update', 'UPDATE'],
     ['trg_admin_cash_no_delete', 'DELETE'],
@@ -606,6 +821,68 @@ export const ensureAdminSchema = async () => {
   if (!idempotencyIndex.length) {
     await pool.query('CREATE UNIQUE INDEX uq_transaksi_idempotency_key ON transaksi (idempotency_key)');
   }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS midtrans_topup_payments (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      santri_id INT NOT NULL,
+      order_id VARCHAR(50) NOT NULL UNIQUE,
+      idempotency_key VARCHAR(64) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
+      status ENUM('creating', 'pending', 'paid', 'expired', 'failed') NOT NULL DEFAULT 'creating',
+      snap_token VARCHAR(255) DEFAULT NULL,
+      qr_string TEXT DEFAULT NULL,
+      qr_code_url VARCHAR(1000) DEFAULT NULL,
+      midtrans_client_key VARCHAR(255) DEFAULT NULL,
+      midtrans_server_key_enc TEXT DEFAULT NULL,
+      midtrans_environment ENUM('sandbox', 'production') DEFAULT NULL,
+      provider_transaction_id VARCHAR(100) DEFAULT NULL,
+      ledger_transaction_id BIGINT DEFAULT NULL UNIQUE,
+      expires_at DATETIME DEFAULT NULL,
+      paid_at DATETIME DEFAULT NULL,
+      status_checked_at DATETIME DEFAULT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_midtrans_payment_user_idempotency (user_id, idempotency_key),
+      INDEX idx_midtrans_payment_user_created (user_id, created_at),
+      INDEX idx_midtrans_payment_status_created (status, created_at),
+      CONSTRAINT fk_midtrans_payment_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE RESTRICT,
+      CONSTRAINT fk_midtrans_payment_santri FOREIGN KEY (santri_id)
+        REFERENCES santri(id) ON DELETE RESTRICT,
+      CONSTRAINT fk_midtrans_payment_ledger FOREIGN KEY (ledger_transaction_id)
+        REFERENCES transaksi(id) ON DELETE RESTRICT
+    )
+  `);
+  for (const column of [
+    { name: 'qr_string', definition: 'TEXT DEFAULT NULL' },
+    { name: 'qr_code_url', definition: 'VARCHAR(1000) DEFAULT NULL' },
+    { name: 'midtrans_client_key', definition: 'VARCHAR(255) DEFAULT NULL' },
+    { name: 'midtrans_server_key_enc', definition: 'TEXT DEFAULT NULL' },
+    { name: 'midtrans_environment', definition: "ENUM('sandbox', 'production') DEFAULT NULL" },
+  ]) {
+    const [existing] = await pool.query(
+      `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'midtrans_topup_payments'
+         AND COLUMN_NAME = ?`,
+      [column.name]
+    );
+    if (!existing.length) {
+      await pool.query(
+        `ALTER TABLE midtrans_topup_payments ADD COLUMN ${column.name} ${column.definition}`
+      );
+    }
+  }
+  await pool.query(
+    `UPDATE midtrans_topup_payments p
+     JOIN institution_settings s ON s.id = 1
+     SET p.midtrans_client_key = COALESCE(p.midtrans_client_key, s.midtrans_client_key),
+         p.midtrans_server_key_enc = COALESCE(p.midtrans_server_key_enc, s.midtrans_server_key_enc),
+         p.midtrans_environment = COALESCE(p.midtrans_environment, s.midtrans_environment)
+     WHERE p.midtrans_client_key IS NULL
+        OR p.midtrans_server_key_enc IS NULL
+        OR p.midtrans_environment IS NULL`
+  );
 
   for (const { column, index } of [
     { column: 'rfid_uid', index: 'uq_credentials_rfid_uid' },

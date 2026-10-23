@@ -4,8 +4,8 @@
 @token = ganti-dengan-jwt-admin
 @mfaChallenge = ganti-dengan-challenge-token
 @mfaCode = 123456
-@adminUsername = ganti-dengan-admin-yang-diprovisikan
-@adminPassword = ganti-dengan-password-admin
+@adminUsername = adminutama
+@adminPassword = passwordadmin123
 @secondAdminToken = ganti-dengan-token-admin-kedua
 @financialApprovalId = isi-dari-response-permintaan
 

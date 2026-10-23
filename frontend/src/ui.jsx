@@ -1,12 +1,67 @@
-import { useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, Bell, Blocks, BookOpenText,
-  ChevronLeft, ChevronRight, CircleUserRound, ClipboardList, Coffee, CreditCard,
-  Fingerprint, LayoutDashboard, LogOut, Menu, Search, ShieldCheck, SlidersHorizontal, Users, Wallet, X,
+  ChevronLeft, ChevronRight, CircleUserRound, ClipboardList, Coffee, CreditCard, Download,
+  Fingerprint, LayoutDashboard, LogOut, Menu, MessageCircle, Package, Search, Settings2, ShieldCheck, SlidersHorizontal, Users, Wallet, X,
 } from 'lucide-react';
+import { api, resolveAssetUrl } from './api.js';
 
 export const cx = (...values) => values.filter(Boolean).join(' ');
+export const InstitutionContext = createContext({
+  name: 'PondokPay',
+  app_name: null,
+  logo_path: null,
+  timezone: 'Asia/Jakarta',
+});
+export const useInstitution = () => useContext(InstitutionContext);
+const PwaInstallContext = createContext({ installPrompt: null, install: async () => false, installed: false });
+let institutionTimeZone = 'Asia/Jakarta';
+
+export const setInstitutionTimeZone = (timezone) => {
+  institutionTimeZone = timezone || 'Asia/Jakarta';
+};
+
+export function PwaInstallProvider({ children }) {
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    setInstalled(
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true,
+    );
+    const handleBeforeInstall = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    const handleInstalled = () => {
+      setInstalled(true);
+      setInstallPrompt(null);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  const install = async () => {
+    if (!installPrompt) return false;
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    setInstallPrompt(null);
+    if (choice.outcome === 'accepted') setInstalled(true);
+    return choice.outcome === 'accepted';
+  };
+
+  return (
+    <PwaInstallContext.Provider value={{ installPrompt, install, installed }}>
+      {children}
+    </PwaInstallContext.Provider>
+  );
+}
 
 export function formatMoney(value, currency = 'IDR') {
   return new Intl.NumberFormat('id-ID', {
@@ -21,6 +76,7 @@ export function formatDate(value, withTime = false) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return new Intl.DateTimeFormat('id-ID', {
+    timeZone: institutionTimeZone,
     dateStyle: 'medium',
     ...(withTime ? { timeStyle: 'short' } : {}),
   }).format(date);
@@ -35,12 +91,18 @@ export function Avatar({ name, className = '' }) {
 }
 
 export function Brand({ inverse = false }) {
+  const institution = useInstitution();
   return (
     <div className={cx('flex items-center gap-2.5 font-bold tracking-tight', inverse ? 'text-white' : 'text-pondok-700')}>
       <span className={cx('grid h-9 w-9 place-items-center rounded-xl', inverse ? 'bg-white/10' : 'bg-pondok-50')}>
-        <Blocks size={21} />
+        {institution.logo_path
+          ? <img src={resolveAssetUrl(institution.logo_path)} alt="" className="h-full w-full rounded-xl object-contain" />
+          : <Blocks size={21} />}
       </span>
-      <span className="text-xl">PondokPay</span>
+      <span className="min-w-0">
+        <span className="block truncate text-xl">{institution.name || 'PondokPay'}</span>
+        <span className={cx('block text-[10px] font-medium tracking-normal', inverse ? 'text-white/65' : 'text-muted')}>PondokPay</span>
+      </span>
     </div>
   );
 }
@@ -138,6 +200,54 @@ export function Modal({ title, onClose, children, size = 'max-w-lg' }) {
   );
 }
 
+export function PwaInstallButton() {
+  const { installPrompt, install, installed } = useContext(PwaInstallContext);
+  const [helpOpen, setHelpOpen] = useState(false);
+  if (installed) return null;
+
+  const handleClick = async () => {
+    if (!installPrompt) {
+      setHelpOpen(true);
+      return;
+    }
+    try {
+      const accepted = await install();
+      if (!accepted) setHelpOpen(true);
+    } catch (error) {
+      console.error('PWA installation prompt failed:', error);
+      setHelpOpen(true);
+    }
+  };
+  const isIos = typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[11px] font-semibold text-pondok-700 transition hover:bg-pondok-50 sm:px-3"
+        onClick={handleClick}
+        title="Pasang aplikasi PondokPay"
+      >
+        <Download size={15} />
+        <span>Pasang<span className="hidden sm:inline"> aplikasi</span></span>
+      </button>
+      {helpOpen && (
+        <Modal title="Pasang aplikasi di perangkat" onClose={() => setHelpOpen(false)}>
+          <div className="space-y-3 text-sm leading-relaxed text-muted">
+            <p>PondokPay dipasang langsung dari browser sebagai PWA. Ini bukan file APK.</p>
+            {isIos ? (
+              <p>Di Safari, ketuk tombol <strong className="text-ink">Bagikan</strong>, lalu pilih <strong className="text-ink">Tambahkan ke Layar Utama</strong>.</p>
+            ) : (
+              <p>Buka menu browser <strong className="text-ink">⋮</strong> lalu pilih <strong className="text-ink">Instal aplikasi</strong> atau <strong className="text-ink">Tambahkan ke layar utama</strong>. Nama aplikasi dan ikon mengikuti pengaturan admin.</p>
+            )}
+          </div>
+          <button type="button" className="btn-primary mt-5 w-full" onClick={() => setHelpOpen(false)}>Mengerti</button>
+        </Modal>
+      )}
+    </>
+  );
+}
+
 export function Loading({ label = 'Memuat data...' }) {
   return <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-muted"><span className="h-5 w-5 animate-spin rounded-full border-2 border-pondok-200 border-t-pondok-600" />{label}</div>;
 }
@@ -171,8 +281,10 @@ const adminLinks = [
   { to: '/admin/kantin', label: 'Kantin & kasir', icon: Coffee },
   { to: '/admin/wali', label: 'Orang tua / wali', icon: CircleUserRound },
   { to: '/admin/transaksi', label: 'Transaksi', icon: ArrowLeftRight },
+  { to: '/admin/reports/financial', label: 'Laporan finansial', icon: ClipboardList },
 ];
 const managementLinks = [
+  { to: '/admin/settings', label: 'Pengaturan pondok', icon: Settings2 },
   { to: '/admin/cash', label: 'Kas admin', icon: Banknote },
   { to: '/admin/users', label: 'Akun pengguna', icon: CircleUserRound },
   { to: '/admin/credentials', label: 'Kredensial', icon: Fingerprint },
@@ -181,6 +293,7 @@ const managementLinks = [
 ];
 
 export function AdminLayout({ user, onLogout }) {
+  const institution = useInstitution();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -190,7 +303,7 @@ export function AdminLayout({ user, onLogout }) {
 
   const menu = (
     <div className="flex h-full flex-col bg-pondok-700 text-white">
-      <div className="px-5 pb-5 pt-6"><Brand inverse /><div className="mt-7"><p className="text-sm font-semibold">Pondok Assa'adah</p><p className="mt-1 text-xs text-white/60">Ruang administrasi</p></div></div>
+      <div className="px-5 pb-5 pt-6"><Brand inverse /><div className="mt-7"><p className="text-sm font-semibold">{institution.name}</p><p className="mt-1 text-xs text-white/60">Ruang administrasi</p></div></div>
       <nav className="flex-1 px-3">
         <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-white/55">Utama</p>
         {adminLinks.map(({ to, label, icon: Icon, end }) => (
@@ -221,10 +334,10 @@ export function AdminLayout({ user, onLogout }) {
       <div className="min-w-0 flex-1 lg:ml-[236px]">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-line bg-white/95 px-4 backdrop-blur sm:px-7">
           <div className="flex items-center gap-3"><button className="rounded-lg p-2 hover:bg-canvas lg:hidden" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><span className="text-sm text-muted">Admin</span><ChevronRight size={15} className="text-muted" /><span className="text-sm font-semibold">{pageName}</span></div>
-          <div className="flex items-center gap-3 text-xs text-muted"><span className="hidden sm:inline">{new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date())}</span><span className="badge-green">Sesi aman</span></div>
+          <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted"><PwaInstallButton /><span className="hidden sm:inline">{new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: institution.timezone || 'Asia/Jakarta' }).format(new Date())}</span><span className="badge-green">Sesi aman</span></div>
         </header>
         <main className="mx-auto max-w-[1480px] p-4 sm:p-7"><Outlet /></main>
-        <footer className="flex justify-between px-4 pb-6 text-[11px] text-muted sm:px-7"><span>PondokPay · Pondok Assa'adah</span><span>Amanah dalam setiap transaksi</span></footer>
+        <footer className="flex justify-between gap-4 px-4 pb-6 text-[11px] text-muted sm:px-7"><span>PondokPay · {institution.name}</span><span>Amanah dalam setiap transaksi</span></footer>
       </div>
     </div>
   );
@@ -236,7 +349,18 @@ const bottomLinks = [
   { to: 'account', label: 'Akun', icon: CircleUserRound },
 ];
 
-export function MobileLayout({ user, basePath, title, children, onLogout }) {
+export function MobileLayout({ user, basePath, title, children, onLogout, token }) {
+  if (user.role === 'kasir') {
+    return (
+      <CashierFrame
+        user={user}
+        basePath={basePath}
+        children={children}
+        onLogout={onLogout}
+        token={token}
+      />
+    );
+  }
   const location = useLocation();
   const navigate = useNavigate();
   const navigationLinks = user.role === 'wali'
@@ -244,27 +368,195 @@ export function MobileLayout({ user, basePath, title, children, onLogout }) {
       { to: '', label: 'Beranda', icon: LayoutDashboard },
       { to: 'history', label: 'Riwayat', icon: ClipboardList },
       { to: 'limit', label: 'Limit', icon: SlidersHorizontal },
+      { to: 'topup', label: 'Top-up', icon: Wallet },
+      { to: 'account', label: 'WhatsApp', icon: MessageCircle },
     ]
     : user.role === 'kasir'
       ? [
         { to: '', label: 'Transaksi', icon: Wallet },
+        { to: 'catalog', label: 'Produk', icon: Package },
         { to: 'history', label: 'Riwayat', icon: ClipboardList },
         { to: 'account', label: 'Akun', icon: CircleUserRound },
       ]
     : bottomLinks;
   return (
-    <div className="mx-auto min-h-screen max-w-[520px] bg-[#f4f7f4] pb-24 shadow-xl">
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line/70 bg-[#f4f7f4]/95 px-5 py-3.5 backdrop-blur-xl">
+    <div className={cx('mx-auto min-h-screen bg-[#f4f7f4] shadow-xl', user.role === 'kasir' ? 'max-w-7xl pb-20' : 'max-w-[520px] pb-24')}>
+      <header className={cx('sticky top-0 z-20 flex items-center justify-between border-b border-line/70 bg-[#f4f7f4]/95 backdrop-blur-xl', user.role === 'kasir' ? 'px-3.5 py-2.5 sm:px-5 sm:py-3' : 'px-5 py-3.5')}>
         <Link to={basePath}><Brand /></Link>
         {user.role === 'wali'
-          ? <button className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-muted transition hover:text-pondok-700" onClick={onLogout} aria-label="Keluar"><LogOut size={17} /></button>
+          ? <div className="flex items-center gap-2"><PwaInstallButton /><button className="grid h-9 w-9 place-items-center rounded-full border border-line bg-white text-muted transition hover:text-pondok-700" onClick={onLogout} aria-label="Keluar"><LogOut size={16} /></button></div>
           : <span className="badge-green capitalize">{user.role}</span>}
       </header>
-      <main className="px-4 pb-6 pt-4 sm:px-5">{title && <h1 className="mb-4 text-2xl font-medium">{title}</h1>}{children}</main>
-      <nav className="fixed bottom-0 left-1/2 z-30 grid w-full max-w-[520px] -translate-x-1/2 grid-cols-3 border-t border-line/80 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 shadow-[0_-8px_24px_rgba(24,63,54,0.06)] backdrop-blur-xl">
+      <main className={cx(user.role === 'kasir' ? 'px-3.5 pb-5 pt-3 sm:px-5 sm:pt-4 lg:px-7' : 'px-4 pb-6 pt-4 sm:px-5')}>
+        {title && <h1 className="mb-4 text-2xl font-medium">{title}</h1>}{children}
+      </main>
+      <nav className={cx(
+        'fixed bottom-0 left-1/2 z-30 grid w-full -translate-x-1/2 border-t border-line/80 bg-white/95 px-2 shadow-[0_-8px_24px_rgba(24,63,54,0.06)] backdrop-blur-xl',
+        user.role === 'kasir' ? 'pb-[max(env(safe-area-inset-bottom),6px)] pt-1' : 'pb-[max(env(safe-area-inset-bottom),10px)] pt-2',
+        user.role === 'kasir' ? 'max-w-7xl' : 'max-w-[520px]',
+        navigationLinks.length === 5 ? 'grid-cols-5' : navigationLinks.length === 4 ? 'grid-cols-4' : 'grid-cols-3',
+      )}>
         {navigationLinks.map(({ to, label, icon: Icon }) => {
           const active = to ? location.pathname.startsWith(`${basePath}/${to}`) : location.pathname === basePath || location.pathname === `${basePath}/`;
-          return <button key={label} onClick={() => navigate(to ? `${basePath}/${to}` : basePath)} className={cx('relative flex min-h-12 flex-col items-center justify-center gap-1 py-1.5 text-[11px] transition', active ? 'font-semibold text-pondok-700' : 'text-muted')}><Icon size={20} strokeWidth={active ? 2.4 : 1.8} /><span>{label}</span>{active && <span className="absolute -top-2 h-0.5 w-8 rounded-full bg-pondok-600" />}</button>;
+          return <button key={label} onClick={() => navigate(to ? `${basePath}/${to}` : basePath)} className={cx('relative flex flex-col items-center justify-center transition', user.role === 'kasir' ? 'min-h-10 gap-0.5 py-1 text-[10px]' : 'min-h-12 gap-1 py-1.5 text-[11px]', active ? 'font-semibold text-pondok-700' : 'text-muted')}><Icon size={user.role === 'kasir' ? 18 : 20} strokeWidth={active ? 2.4 : 1.8} /><span>{label}</span>{active && <span className="absolute -top-1 h-0.5 w-7 rounded-full bg-pondok-600" />}</button>;
+        })}
+      </nav>
+    </div>
+  );
+}
+
+function CashierFrame({ user, basePath, children, onLogout, token }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const institution = useInstitution();
+  const [canteens, setCanteens] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [frameError, setFrameError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([api.get('/kantin', token), api.get('/kantin/pencairan/persetujuan', token)])
+      .then(([canteenResult, approvalResult]) => {
+        if (!active) return;
+        setCanteens(canteenResult.data || []);
+        setPendingCount((approvalResult.data || []).length);
+      })
+      .catch((error) => {
+        if (active) setFrameError(error.message);
+      });
+    return () => { active = false; };
+  }, [token]);
+
+  const selectedCanteen = canteens[0];
+  const navigation = [
+    { to: '', label: 'Kasir', icon: Coffee, desktopLabel: 'Kasir' },
+    { to: 'catalog', label: 'Produk', icon: Package, desktopLabel: 'Produk & stok' },
+    { to: 'history', label: 'Riwayat', icon: ClipboardList, desktopLabel: 'Riwayat transaksi' },
+    { to: 'payout-approvals', label: 'Lainnya', icon: Blocks, desktopLabel: 'Persetujuan pencairan' },
+  ];
+  const pageTitle = navigation.find(({ to }) =>
+    to ? location.pathname.startsWith(`${basePath}/${to}`) : location.pathname === basePath || location.pathname === `${basePath}/`,
+  )?.desktopLabel || 'Akun';
+  const navButtonClass = (active) => cx(
+    'flex items-center gap-3 rounded-xl text-sm transition',
+    active ? 'bg-[#e9f4ef] font-semibold text-[#078264]' : 'text-[#718079] hover:bg-[#f5f7f4]',
+  );
+
+  return (
+    <div className="mx-auto min-h-screen bg-[#f5f6f2] text-[#20352e] lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[216px] flex-col border-r border-[#e0e5dd] bg-white lg:flex">
+        <div className="border-b border-[#e9ece7] px-5 py-6">
+          <Brand />
+        </div>
+        <div className="mx-4 mt-4 rounded-2xl bg-[#f5f5f1] p-3">
+          <p className="truncate text-sm font-semibold">{selectedCanteen?.nama || 'Kantin'}</p>
+          <p className="mt-1 truncate text-[11px] text-muted">{selectedCanteen?.lokasi || 'Kantin yang ditugaskan'}</p>
+          <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#e5f4ec] px-2 py-1 text-[10px] font-semibold text-[#078264]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#078264]" />
+            {selectedCanteen?.status === 'active' ? 'Aktif' : 'Memuat'}
+          </span>
+        </div>
+        <nav className="mt-5 flex-1 px-4">
+          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-[#9aa69f]">Ruang kerja</p>
+          {navigation.map(({ to, icon: Icon, desktopLabel }) => {
+            const active = to
+              ? location.pathname.startsWith(`${basePath}/${to}`)
+              : location.pathname === basePath || location.pathname === `${basePath}/`;
+            return (
+              <button
+                key={to}
+                type="button"
+                onClick={() => navigate(to ? `${basePath}/${to}` : basePath)}
+                className={cx(navButtonClass(active), 'mb-1.5 min-h-11 w-full px-3 text-left')}
+              >
+                <Icon size={17} />
+                <span className="flex-1">{desktopLabel}</span>
+                {to === 'payout-approvals' && pendingCount > 0 && (
+                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{pendingCount}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="mx-4 mb-3 rounded-xl bg-[#104a39] p-4 text-white">
+          <CreditCard size={17} className="mb-3 text-white/80" />
+          <p className="text-[11px] text-white/70">Saldo kantin</p>
+          <p className="mt-1 text-xl font-semibold">{formatMoney(selectedCanteen?.saldo || 0)}</p>
+          <p className="mt-2 text-[10px] leading-4 text-white/65">Dikelola bersama, tercatat rapi.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate(`${basePath}/account`)}
+          className="mx-4 mb-3 flex items-center gap-2 rounded-lg bg-[#e9f4ef] px-3 py-2 text-left text-[11px] text-[#176b50]"
+        >
+          <ShieldCheck size={15} />
+          Akun dilindungi MFA
+        </button>
+        <div className="flex items-center gap-3 border-t border-[#e9ece7] px-4 py-3">
+          <Avatar name={user.username} className="h-8 w-8 bg-[#f2f3ef] text-xs" />
+          <button
+            type="button"
+            onClick={() => navigate(`${basePath}/account`)}
+            className="min-w-0 flex-1 text-left"
+          >
+            <p className="truncate text-xs font-semibold">{user.username}</p>
+            <p className="text-[10px] text-muted">Kasir kantin</p>
+          </button>
+          <button onClick={onLogout} className="rounded-lg p-1.5 text-muted hover:bg-canvas" aria-label="Keluar">
+            <LogOut size={15} />
+          </button>
+        </div>
+      </aside>
+      <div className="min-w-0 flex-1 lg:ml-[216px]">
+        <header className="sticky top-0 z-20 flex min-h-[60px] items-center justify-between border-b border-[#e0e5dd] bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="lg:hidden">
+              <Brand />
+              <p className="ml-10 -mt-1 max-w-[210px] truncate text-[10px] text-muted">{selectedCanteen?.nama || 'Ruang kasir'}</p>
+            </div>
+            <div className="hidden items-center gap-2 text-xs lg:flex">
+              <span className="text-muted">{selectedCanteen?.nama || institution.name}</span>
+              <ChevronRight size={14} className="text-muted" />
+              <span className="font-semibold">{pageTitle}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-muted sm:gap-3 sm:text-xs">
+            <PwaInstallButton />
+            <span className="hidden sm:inline">
+              {new Intl.DateTimeFormat('id-ID', { dateStyle: 'full', timeZone: institution.timezone || 'Asia/Jakarta' }).format(new Date())}
+            </span>
+            <span className="hidden h-4 border-l border-line sm:inline" />
+            <button
+              type="button"
+              onClick={() => navigate(`${basePath}/account`)}
+              aria-label="Buka pengaturan akun"
+              className="inline-flex items-center gap-1 text-[#078264]"
+            >
+              <ShieldCheck size={14} /> MFA aktif
+            </button>
+          </div>
+        </header>
+        <main className="mx-auto min-h-[calc(100vh-60px)] max-w-[1500px] px-4 pb-24 pt-4 sm:px-6 lg:px-7 lg:pb-8 lg:pt-7">
+          {frameError && <Alert type="error" className="mb-4">{frameError}</Alert>}
+          {children}
+        </main>
+      </div>
+      <nav className="fixed bottom-0 left-1/2 z-30 grid w-full max-w-[520px] -translate-x-1/2 grid-cols-4 border-t border-[#e0e5dd] bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1 shadow-[0_-8px_24px_rgba(24,63,54,0.06)] backdrop-blur-xl lg:hidden">
+        {navigation.map(({ to, label, icon: Icon }) => {
+          const active = to
+            ? location.pathname.startsWith(`${basePath}/${to}`)
+            : location.pathname === basePath || location.pathname === `${basePath}/`;
+          return (
+            <button
+              key={to}
+              onClick={() => navigate(to ? `${basePath}/${to}` : basePath)}
+              className={cx('relative flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px]', active ? 'font-semibold text-[#078264]' : 'text-muted')}
+            >
+              <Icon size={18} strokeWidth={active ? 2.4 : 1.8} />
+              <span>{label}</span>
+              {active && <span className="absolute -top-1 h-0.5 w-7 rounded-full bg-[#078264]" />}
+            </button>
+          );
         })}
       </nav>
     </div>

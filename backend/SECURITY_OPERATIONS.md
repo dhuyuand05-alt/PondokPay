@@ -6,6 +6,8 @@ This API handles real balances. Do not expose it to the public internet until th
 
 - `JWT_SECRET` must be at least 32 cryptographically random bytes. Changing it invalidates every active access and MFA challenge token.
 - `MFA_ENCRYPTION_KEY` and `BACKUP_ENCRYPTION_KEY` must each be independent 32-byte random keys encoded as 64 hex characters. Keep them in a secret manager, not source control or database backups. Losing the MFA key requires a controlled MFA reset; losing the backup key makes encrypted backups unrecoverable.
+- Baileys session files in `WHATSAPP_AUTH_DIR` are device credentials. Keep the dedicated directory private to the backend service account, persistent across deployments, excluded from Git/static serving, and out of ordinary source backups. Do not copy the session between institutions or machines. Deleting the session requires pairing again.
+- Baileys is an unofficial WhatsApp Web integration and may be disconnected or restricted by WhatsApp. Use a dedicated number, send only parent-approved transaction notifications, honor opt-outs promptly, and follow applicable WhatsApp terms. A parent-initiated verification message is an opt-in safeguard, not a guarantee against restrictions.
 - The known default `admin` / `admin123` account is disabled during migration. No default administrator is created at startup. Create an administrator only after migrations using `ADMIN_USERNAME` and a unique `ADMIN_PASSWORD` of at least 12 bytes and no more than bcrypt's 72-byte limit:
 
   ```powershell
@@ -34,6 +36,7 @@ Run `npm run migrate` with a separate `MIGRATION_DB_USER` account before deployi
 ```sql
 GRANT SELECT, INSERT, UPDATE ON db_cashless_santri.* TO 'cashless_app'@'%';
 GRANT DELETE ON db_cashless_santri.wali_santri TO 'cashless_app'@'%';
+GRANT DELETE ON db_cashless_santri.parent_notification_settings TO 'cashless_app'@'%';
 GRANT DELETE ON db_cashless_santri.kantin_kasir TO 'cashless_app'@'%';
 GRANT DELETE ON db_cashless_santri.security_rate_limits TO 'cashless_app'@'%';
 ```
@@ -53,7 +56,7 @@ The app deactivates accounts/students/canteens and blocks credentials rather tha
 
 ## Encrypted backups and restore tests
 
-Install the MySQL client tools (`mysqldump` and `mysql`) on the backup host. Set `BACKUP_DIR` to a protected path outside the source tree and use a separate `BACKUP_ENCRYPTION_KEY`. Configure `BACKUP_DB_USER` as a dedicated dump-only account with the MySQL privileges required for dumps, not as the runtime or migration user. `npm run backup` creates an AES-256-GCM encrypted dump; store copies off-site with restricted access and retain the decryption key separately.
+Install the MySQL client tools (`mysqldump` and `mysql`) on the backup host. Set `BACKUP_DIR` to a protected path outside the source tree and use a separate `BACKUP_ENCRYPTION_KEY`. Configure `BACKUP_DB_USER` as a dedicated dump-only account with the MySQL privileges required for dumps, not as the runtime or migration user. `npm run backup` creates an AES-256-GCM encrypted database dump; store copies off-site with restricted access and retain the decryption key separately. The database backup does not include uploaded pondok logos; back up the `UPLOAD_DIR` contents separately and restore them alongside the database.
 
 At a scheduled interval, restore a backup into a new, empty staging database (never the production database):
 

@@ -30,11 +30,47 @@ const getIdempotencyKey = (req) => {
 const duplicateError = (error) => error.code === 'ER_DUP_ENTRY';
 
 const moneyToCents = (value) => {
-  const [whole, fraction = ''] = String(value).split('.');
-  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+  const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));
+  if (!match) throw new Error('Invalid decimal amount returned by the database.');
+  const sign = match[1] === '-' ? -1n : 1n;
+  return sign * (BigInt(match[2]) * 100n + BigInt((match[3] || '').padEnd(2, '0')));
 };
 
 const centsToMoney = (value) => `${value / 100n}.${String(value % 100n).padStart(2, '0')}`;
+
+const adminCashLockName = 'pondokpay_admin_cash_ledger';
+
+const acquireAdminCashLock = async (connection) => {
+  const [[result]] = await connection.query('SELECT GET_LOCK(?, 10) AS acquired', [adminCashLockName]);
+  if (Number(result.acquired) !== 1) {
+    const error = new Error('Kas admin sedang diproses. Silakan coba kembali.');
+    error.code = 'ADMIN_CASH_LOCK_TIMEOUT';
+    throw error;
+  }
+};
+
+const releaseAdminCashLock = async (connection) => {
+  try {
+    const [[result]] = await connection.query('SELECT RELEASE_LOCK(?) AS released', [adminCashLockName]);
+    if (Number(result.released) !== 1) {
+      throw new Error('MySQL did not release the admin cash lock.');
+    }
+    connection.release();
+  } catch (error) {
+    console.error('Release admin cash lock error:', error);
+    connection.destroy();
+  }
+};
+
+const getAdminCashBalance = async (connection) => {
+  const [[result]] = await connection.query(
+    `SELECT COALESCE(
+       SUM(CASE WHEN direction = 'income' THEN amount ELSE -amount END), 0
+     ) AS balance
+     FROM admin_cash_entries`
+  );
+  return moneyToCents(result.balance);
+};
 
 const nextServiceFeePeriod = () => {
   const next = new Date(`${currentServiceFeePeriod()}T00:00:00.000Z`);
@@ -133,7 +169,7 @@ export const setMonthlyServiceFee = async (req, res) => {
   }
 };
 
-export const createAdminExpense = async (req, res) => {
+const createManualCashEntry = async (req, res, direction) => {
   const { category, description } = req.body;
   const amount = parseMoney(req.body.amount, 'Nominal');
   if (amount.error) return res.status(400).json({ message: amount.error });
@@ -145,8 +181,19 @@ export const createAdminExpense = async (req, res) => {
   if (typeof description !== 'string' || !description.trim() || description.trim().length > 500) {
     return res.status(400).json({ message: 'Keterangan wajib diisi dan maksimal 500 karakter.' });
   }
+  const entryCategory = category.trim();
+  const entryDescription = description.trim();
+  const entryLabel = direction === 'income' ? 'pemasukan' : 'pengeluaran';
+  let connection;
+  let lockAcquired = false;
+  let transactionStarted = false;
   try {
-    const [previous] = await pool.query(
+    connection = await pool.getConnection();
+    await acquireAdminCashLock(connection);
+    lockAcquired = true;
+    await connection.beginTransaction();
+    transactionStarted = true;
+    const [previous] = await connection.query(
       `SELECT id, direction, category, amount, description, created_by
        FROM admin_cash_entries WHERE idempotency_key = ? LIMIT 1`,
       [key]
@@ -154,50 +201,57 @@ export const createAdminExpense = async (req, res) => {
     if (previous.length) {
       const entry = previous[0];
       if (Number(entry.created_by) !== req.user.id ||
-          entry.direction !== 'expense' ||
-          entry.category !== category.trim() ||
+          entry.direction !== direction ||
+          entry.category !== entryCategory ||
           String(entry.amount) !== amount.value ||
-          entry.description !== description.trim()) {
+          entry.description !== entryDescription) {
+        await connection.rollback();
+        transactionStarted = false;
         return res.status(409).json({ message: 'Idempotency-Key sudah dipakai untuk catatan kas lain.' });
       }
-      return res.status(200).json({ message: 'Pengeluaran sudah dicatat sebelumnya.', data: entry });
+      await connection.commit();
+      transactionStarted = false;
+      return res.status(200).json({ message: `${entryLabel[0].toUpperCase()}${entryLabel.slice(1)} sudah dicatat sebelumnya.`, data: entry });
     }
-    const [result] = await pool.query(
+    if (direction === 'expense' &&
+        await getAdminCashBalance(connection) < moneyToCents(amount.value)) {
+      await connection.rollback();
+      transactionStarted = false;
+      return res.status(409).json({ message: 'Saldo kas admin tidak mencukupi untuk pengeluaran ini.' });
+    }
+    const [result] = await connection.query(
       `INSERT INTO admin_cash_entries
          (direction, category, amount, description, idempotency_key, created_by)
-       VALUES ('expense', ?, ?, ?, ?, ?)`,
-      [category.trim(), amount.value, description.trim(), key, req.user.id]
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [direction, entryCategory, amount.value, entryDescription, key, req.user.id]
     );
+    await connection.commit();
+    transactionStarted = false;
     return res.status(201).json({
-      message: 'Pengeluaran berhasil dicatat.',
-      data: { id: result.insertId, direction: 'expense', category: category.trim(), amount: amount.value },
+      message: `${entryLabel[0].toUpperCase()}${entryLabel.slice(1)} berhasil dicatat.`,
+      data: { id: result.insertId, direction, category: entryCategory, amount: amount.value },
     });
   } catch (error) {
-    if (duplicateError(error)) {
-      try {
-        const [previous] = await pool.query(
-          `SELECT id, direction, category, amount, description, created_by
-           FROM admin_cash_entries WHERE idempotency_key = ? LIMIT 1`,
-          [key]
-        );
-        const entry = previous[0];
-        if (entry && Number(entry.created_by) === req.user.id &&
-            entry.direction === 'expense' &&
-            entry.category === category.trim() &&
-            String(entry.amount) === amount.value &&
-            entry.description === description.trim()) {
-          return res.status(200).json({ message: 'Pengeluaran sudah dicatat sebelumnya.', data: entry });
-        }
-        return res.status(409).json({ message: 'Idempotency-Key sudah dipakai untuk catatan kas lain.' });
-      } catch (lookupError) {
-        console.error('Lookup idempotent expense error:', lookupError);
-        return res.status(500).json({ message: 'Gagal memverifikasi status pengeluaran.' });
-      }
+    if (transactionStarted) await connection.rollback();
+    if (error.code === 'ADMIN_CASH_LOCK_TIMEOUT') {
+      return res.status(503).json({ message: error.message });
     }
-    console.error('Create admin expense error:', error);
-    return res.status(500).json({ message: 'Gagal mencatat pengeluaran.' });
+    if (duplicateError(error)) {
+      return res.status(409).json({ message: 'Idempotency-Key sudah dipakai untuk catatan kas lain.' });
+    }
+    console.error(`Create admin ${direction} error:`, error);
+    return res.status(500).json({ message: `Gagal mencatat ${entryLabel}.` });
+  } finally {
+    if (connection) {
+      if (lockAcquired) await releaseAdminCashLock(connection);
+      else connection.release();
+    }
   }
 };
+
+export const createAdminExpense = (req, res) => createManualCashEntry(req, res, 'expense');
+
+export const createAdminIncome = (req, res) => createManualCashEntry(req, res, 'income');
 
 export const reverseAdminCashEntry = async (req, res) => {
   const entryId = parseEntryId(req.params.id);
@@ -208,11 +262,17 @@ export const reverseAdminCashEntry = async (req, res) => {
   if (typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
     return res.status(400).json({ message: 'Alasan koreksi wajib diisi dan maksimal 500 karakter.' });
   }
+  let connection;
+  let lockAcquired = false;
+  let transactionStarted = false;
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
     let result;
     try {
+      await acquireAdminCashLock(connection);
+      lockAcquired = true;
       await connection.beginTransaction();
+      transactionStarted = true;
       const [entries] = await connection.query(
         `SELECT id, direction, category, amount
          FROM admin_cash_entries WHERE id = ? FOR UPDATE`,
@@ -220,6 +280,7 @@ export const reverseAdminCashEntry = async (req, res) => {
       );
       if (!entries.length) {
         await connection.rollback();
+        transactionStarted = false;
         return res.status(404).json({ message: 'Catatan kas tidak ditemukan.' });
       }
       const [previousByKey] = await connection.query(
@@ -233,9 +294,11 @@ export const reverseAdminCashEntry = async (req, res) => {
             Number(entry.reverses_entry_id) !== entryId ||
             entry.description !== reason.trim()) {
           await connection.rollback();
+          transactionStarted = false;
           return res.status(409).json({ message: 'Idempotency-Key sudah dipakai untuk catatan kas lain.' });
         }
         await connection.commit();
+        transactionStarted = false;
         return res.status(200).json({
           message: 'Catatan koreksi kas sudah dibuat sebelumnya.',
           data: {
@@ -252,10 +315,17 @@ export const reverseAdminCashEntry = async (req, res) => {
       );
       if (reversals.length) {
         await connection.rollback();
+        transactionStarted = false;
         return res.status(409).json({ message: 'Catatan kas ini sudah pernah dikoreksi.' });
       }
       const original = entries[0];
       const direction = original.direction === 'income' ? 'expense' : 'income';
+      if (direction === 'expense' &&
+          await getAdminCashBalance(connection) < moneyToCents(original.amount)) {
+        await connection.rollback();
+        transactionStarted = false;
+        return res.status(409).json({ message: 'Saldo kas admin tidak mencukupi untuk mengoreksi pemasukan ini.' });
+      }
       const [inserted] = await connection.query(
         `INSERT INTO admin_cash_entries
            (direction, category, amount, description, reverses_entry_id, idempotency_key, created_by)
@@ -264,14 +334,19 @@ export const reverseAdminCashEntry = async (req, res) => {
       );
       result = { id: inserted.insertId, direction, amount: original.amount, reverses_entry_id: entryId };
       await connection.commit();
+      transactionStarted = false;
     } catch (error) {
-      await connection.rollback();
+      if (transactionStarted) await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      if (lockAcquired) await releaseAdminCashLock(connection);
+      else connection.release();
     }
     return res.status(201).json({ message: 'Catatan koreksi kas berhasil dibuat.', data: result });
   } catch (error) {
+    if (error.code === 'ADMIN_CASH_LOCK_TIMEOUT') {
+      return res.status(503).json({ message: error.message });
+    }
     if (duplicateError(error)) {
       return res.status(409).json({ message: 'Catatan kas ini sudah pernah dikoreksi.' });
     }

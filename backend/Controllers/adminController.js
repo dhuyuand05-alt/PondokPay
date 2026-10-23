@@ -4,6 +4,7 @@ import { validatePassword } from '../config/passwords.js';
 import { consumeCanteenPayoutApproval } from '../services/canteenPayoutApprovals.js';
 import { consumeFinancialApproval } from '../services/financialApprovals.js';
 import { collectCurrentServiceFeeDebt } from '../services/monthlyServiceFees.js';
+import { enqueueParentTransactionNotifications } from '../services/whatsappNotifications.js';
 
 const validCredentialStatuses = ['active', 'blocked'];
 const validTransactionTypes = ['belanja', 'topup', 'tarik', 'biaya_layanan'];
@@ -40,6 +41,30 @@ const moneyToCents = (value) => {
 };
 
 const centsToMoney = (value) => `${value / 100n}.${String(value % 100n).padStart(2, '0')}`;
+
+const normalizeSaleItems = (value) => {
+  if (!Array.isArray(value) || !value.length || value.length > 100) {
+    return { error: 'Keranjang harus berisi 1 sampai 100 produk.' };
+  }
+  const items = new Map();
+  for (const row of value) {
+    const productId = parseId(row?.product_id);
+    const quantity = Number(row?.quantity);
+    if (
+      !productId ||
+      (typeof row?.quantity !== 'number' && typeof row?.quantity !== 'string') ||
+      !/^\d+$/.test(String(row.quantity)) ||
+      !Number.isSafeInteger(quantity) ||
+      quantity < 1 ||
+      quantity > 999
+    ) {
+      return { error: 'Produk atau jumlah pada keranjang tidak valid.' };
+    }
+    items.set(productId, (items.get(productId) || 0) + quantity);
+    if (items.get(productId) > 999) return { error: 'Jumlah setiap produk maksimal 999.' };
+  }
+  return { items: [...items].map(([product_id, quantity]) => ({ product_id, quantity })).sort((a, b) => a.product_id - b.product_id) };
+};
 
 const getIdempotencyKey = (req) => {
   const key = req.get('Idempotency-Key')?.trim();
@@ -118,17 +143,87 @@ export const getDashboard = async (req, res) => {
 export const getAuditLogs = async (req, res) => {
   const { page, limit } = parsePagination(req.query);
   const offset = (page - 1) * limit;
+  const conditions = [];
+  const values = [];
+  const actorId = req.query.actor_user_id;
+  if (actorId !== undefined && typeof actorId !== 'string') {
+    return res.status(400).json({ message: 'Filter aktor tidak valid.' });
+  }
+  if (req.query.method !== undefined && typeof req.query.method !== 'string') {
+    return res.status(400).json({ message: 'Filter jenis aksi tidak valid.' });
+  }
+  if ((req.query.from !== undefined && typeof req.query.from !== 'string') ||
+      (req.query.to !== undefined && typeof req.query.to !== 'string')) {
+    return res.status(400).json({ message: 'Filter tanggal tidak valid.' });
+  }
+  const method = typeof req.query.method === 'string' ? req.query.method.toUpperCase() : '';
+  const dateFrom = typeof req.query.from === 'string' ? req.query.from : '';
+  const dateTo = typeof req.query.to === 'string' ? req.query.to : '';
+  const isIsoDate = (value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  if (actorId !== undefined) {
+    if (!/^\d+$/.test(String(actorId)) || Number(actorId) < 1 || !Number.isSafeInteger(Number(actorId))) {
+      return res.status(400).json({ message: 'Filter aktor tidak valid.' });
+    }
+    conditions.push('l.actor_user_id = ?');
+    values.push(Number(actorId));
+  }
+  if (method && !['POST', 'PUT', 'PATCH', 'DELETE', 'LOGIN_OK', 'LOGIN_MFA', 'LOGIN_FAIL'].includes(method)) {
+    return res.status(400).json({ message: 'Filter jenis aksi tidak valid.' });
+  }
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    conditions.push('l.action = ?');
+    values.push(method);
+  } else if (method.startsWith('LOGIN_')) {
+    conditions.push('l.action = ?');
+    values.push(method);
+  }
+  if (dateFrom && !isIsoDate(dateFrom)) {
+    return res.status(400).json({ message: 'Tanggal awal tidak valid.' });
+  }
+  if (dateTo && !isIsoDate(dateTo)) {
+    return res.status(400).json({ message: 'Tanggal akhir tidak valid.' });
+  }
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    return res.status(400).json({ message: 'Tanggal awal tidak boleh melewati tanggal akhir.' });
+  }
+  if (dateFrom) {
+    conditions.push('l.created_at >= ?');
+    values.push(`${dateFrom} 00:00:00`);
+  }
+  if (dateTo) {
+    conditions.push('l.created_at < DATE_ADD(?, INTERVAL 1 DAY)');
+    values.push(dateTo);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   try {
-    const [[count]] = await pool.query('SELECT COUNT(*) AS total FROM audit_logs');
+    const [[count]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM audit_logs l ${where}`,
+      values,
+    );
     const [rows] = await pool.query(
-      `SELECT id, request_id, actor_user_id, action, resource, source_ip,
-              user_agent, status_code, created_at
-       FROM audit_logs ORDER BY id DESC LIMIT ? OFFSET ?`,
-      [limit, offset]
+      `SELECT l.id, l.request_id, l.actor_user_id, u.username AS actor_username,
+              u.role AS actor_role, l.action, l.resource, l.details, l.source_ip,
+              l.user_agent, l.status_code, l.created_at
+       FROM audit_logs l
+       LEFT JOIN users u ON u.id = l.actor_user_id
+       ${where}
+       ORDER BY l.id DESC LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
+    );
+    const [actors] = await pool.query(
+      `SELECT DISTINCT u.id, u.username, u.role
+       FROM audit_logs l
+       INNER JOIN users u ON u.id = l.actor_user_id
+       ORDER BY u.username ASC`,
     );
     return res.status(200).json({
       data: rows,
       pagination: { page, limit, total: count.total },
+      filters: { actors },
     });
   } catch (error) {
     console.error('Get audit logs error:', error);
@@ -727,6 +822,7 @@ export const createTopup = async (req, res) => {
          VALUES (?, 'topup', ?, ?, ?, ?, ?)`,
         [santriId, amount.value, updatedBalance, keterangan, idempotencyKey, req.user.id]
       );
+      await enqueueParentTransactionNotifications(connection, result.insertId);
       const serviceFee = await collectCurrentServiceFeeDebt(connection, {
         santriId,
         balance: updatedBalance,
@@ -859,6 +955,7 @@ export const createWithdrawal = async (req, res) => {
          VALUES (?, 'tarik', ?, ?, ?, ?, ?)`,
         [santriId, amount.value, updatedBalance, keterangan, idempotencyKey, req.user.id]
       );
+      await enqueueParentTransactionNotifications(connection, result.insertId);
       return {
         id: result.insertId,
         santri_id: santriId,
@@ -921,10 +1018,20 @@ export const createWithdrawal = async (req, res) => {
 export const createCanteenSale = async (req, res) => {
   const kantinId = parseId(req.params.id);
   const santriId = parseId(req.body.santri_id);
-  const amount = parseMoney(req.body.jumlah, 'jumlah');
+  const catalogRequest = req.body.items !== undefined;
+  const normalizedItems = catalogRequest ? normalizeSaleItems(req.body.items) : null;
+  const amount = catalogRequest ? { value: undefined } : parseMoney(req.body.jumlah, 'jumlah');
+  const expectedCatalogAmount = catalogRequest && req.body.jumlah !== undefined
+    ? parseMoney(req.body.jumlah, 'jumlah')
+    : null;
   if (!kantinId) return res.status(400).json({ message: 'ID kantin tidak valid.' });
   if (!santriId) return res.status(400).json({ message: 'ID santri tidak valid.' });
-  if (amount.error || !amount.value || Number(amount.value) <= 0) {
+  if (catalogRequest && req.user.role !== 'kasir') {
+    return res.status(403).json({ message: 'Rincian produk hanya dapat dicatat oleh petugas kantin.' });
+  }
+  if (normalizedItems?.error) return res.status(400).json({ message: normalizedItems.error });
+  if (expectedCatalogAmount?.error) return res.status(400).json({ message: expectedCatalogAmount.error });
+  if (!catalogRequest && (amount.error || !amount.value || Number(amount.value) <= 0)) {
     return res.status(400).json({ message: amount.error || 'Jumlah belanja harus lebih dari 0.' });
   }
   const keterangan = req.body.keterangan ?? null;
@@ -939,7 +1046,7 @@ export const createCanteenSale = async (req, res) => {
   try {
     const sale = await runInTransaction(async (connection) => {
       const [canteens] = await connection.query(
-        'SELECT saldo, status FROM kantin WHERE id = ? FOR UPDATE',
+        'SELECT saldo, status, catalog_enabled FROM kantin WHERE id = ? FOR UPDATE',
         [kantinId]
       );
       if (!canteens.length) return { notFound: 'kantin' };
@@ -950,11 +1057,24 @@ export const createCanteenSale = async (req, res) => {
       );
       if (previous.length) {
         const transaction = previous[0];
+        const [previousItems] = await connection.query(
+          'SELECT product_id, quantity FROM canteen_sale_items WHERE transaksi_id = ? ORDER BY product_id',
+          [transaction.id]
+        );
+        const sameItems = catalogRequest &&
+          previousItems.length === normalizedItems.items.length &&
+          previousItems.every((row, index) =>
+            Number(row.product_id) === normalizedItems.items[index].product_id &&
+            Number(row.quantity) === normalizedItems.items[index].quantity) &&
+          (!expectedCatalogAmount?.value ||
+            moneyToCents(transaction.jumlah) === moneyToCents(expectedCatalogAmount.value));
+        const sameManualAmount = !catalogRequest && !previousItems.length &&
+          moneyToCents(transaction.jumlah) === moneyToCents(amount.value);
         if (
           Number(transaction.created_by) !== req.user.id ||
           Number(transaction.santri_id) !== santriId ||
           Number(transaction.kantin_id) !== kantinId ||
-          moneyToCents(transaction.jumlah) !== moneyToCents(amount.value) ||
+          !(sameItems || sameManualAmount) ||
           (transaction.keterangan ?? null) !== keterangan
         ) {
           throw idempotencyConflict();
@@ -968,6 +1088,7 @@ export const createCanteenSale = async (req, res) => {
           santri: { id: santriId, saldo: transaction.saldo_akhir },
           kantin: { id: kantinId, saldo: currentCanteen.saldo },
           transaksi_id: transaction.id,
+          jumlah: transaction.jumlah,
         };
       }
       if (canteens[0].status !== 'active') {
@@ -975,13 +1096,66 @@ export const createCanteenSale = async (req, res) => {
         error.code = 'CANTEEN_INACTIVE';
         throw error;
       }
+      let saleItems = [];
+      let amountCents;
+      if (catalogRequest) {
+        if (!canteens[0].catalog_enabled) {
+          const error = new Error('Mode kasir produk tidak aktif untuk kantin ini.');
+          error.code = 'CATALOG_DISABLED';
+          throw error;
+        }
+        const productIds = normalizedItems.items.map((item) => item.product_id);
+        const [products] = await connection.query(
+          `SELECT id, nama, sku, harga, stok
+           FROM canteen_products
+           WHERE kantin_id = ? AND is_active = TRUE AND id IN (?)
+           ORDER BY id FOR UPDATE`,
+          [kantinId, productIds]
+        );
+        if (products.length !== normalizedItems.items.length) {
+          const error = new Error('Satu atau beberapa produk sudah tidak tersedia.');
+          error.code = 'PRODUCT_UNAVAILABLE';
+          throw error;
+        }
+        const productMap = new Map(products.map((product) => [Number(product.id), product]));
+        amountCents = 0n;
+        saleItems = normalizedItems.items.map((item) => {
+          const product = productMap.get(item.product_id);
+          if (Number(product.stok) < item.quantity) {
+            const error = new Error(`Stok ${product.nama} tidak mencukupi.`);
+            error.code = 'INSUFFICIENT_PRODUCT_STOCK';
+            throw error;
+          }
+          const subtotalCents = moneyToCents(product.harga) * BigInt(item.quantity);
+          amountCents += subtotalCents;
+          return {
+            ...item,
+            product,
+            unitPrice: product.harga,
+            subtotal: centsToMoney(subtotalCents),
+            remainingStock: Number(product.stok) - item.quantity,
+          };
+        });
+        if (amountCents <= 0n || amountCents > 9999999999n) {
+          const error = new Error('Total transaksi melebihi batas yang diizinkan.');
+          error.code = 'SALE_AMOUNT_LIMIT';
+          throw error;
+        }
+        if (expectedCatalogAmount?.value &&
+            moneyToCents(expectedCatalogAmount.value) !== amountCents) {
+          const error = new Error('Harga produk berubah. Muat ulang katalog dan periksa keranjang.');
+          error.code = 'CATALOG_PRICE_CHANGED';
+          throw error;
+        }
+      } else {
+        amountCents = moneyToCents(amount.value);
+      }
       const [students] = await connection.query(
         'SELECT saldo, limit_harian, is_active FROM santri WHERE id = ? FOR UPDATE',
         [santriId]
       );
       if (!students.length || !students[0].is_active) return { notFound: 'santri' };
 
-      const amountCents = moneyToCents(amount.value);
       const studentBalanceCents = moneyToCents(students[0].saldo ?? '0.00');
       if (amountCents > studentBalanceCents) {
         const error = new Error('Saldo santri tidak mencukupi.');
@@ -1019,18 +1193,39 @@ export const createCanteenSale = async (req, res) => {
         `INSERT INTO transaksi
            (santri_id, kantin_id, tipe_transaksi, jumlah, saldo_akhir, keterangan, idempotency_key, created_by)
          VALUES (?, ?, 'belanja', ?, ?, ?, ?, ?)`,
-        [santriId, kantinId, amount.value, studentBalance, keterangan, idempotencyKey, req.user.id]
+        [santriId, kantinId, centsToMoney(amountCents), studentBalance, keterangan, idempotencyKey, req.user.id]
       );
+      for (const item of saleItems) {
+        await connection.query(
+          `INSERT INTO canteen_sale_items
+             (transaksi_id, product_id, nama_produk, sku, harga_satuan, quantity, subtotal)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [transaction.insertId, item.product.id, item.product.nama, item.product.sku,
+            item.unitPrice, item.quantity, item.subtotal]
+        );
+        await connection.query(
+          'UPDATE canteen_products SET stok = ? WHERE id = ?',
+          [item.remainingStock, item.product.id]
+        );
+        await connection.query(
+          `INSERT INTO canteen_stock_movements
+             (product_id, transaksi_id, user_id, movement_type, quantity_change, stock_after, note)
+           VALUES (?, ?, ?, 'sale', ?, ?, 'Penjualan melalui kasir')`,
+          [item.product.id, transaction.insertId, req.user.id, -item.quantity, item.remainingStock]
+        );
+      }
+      await enqueueParentTransactionNotifications(connection, transaction.insertId);
       await connection.query(
         `INSERT INTO kantin_transaksi
            (kantin_id, transaksi_id, tipe_transaksi, jumlah, saldo_akhir, keterangan)
          VALUES (?, ?, 'penjualan', ?, ?, ?)`,
-        [kantinId, transaction.insertId, amount.value, canteenBalance, keterangan]
+        [kantinId, transaction.insertId, centsToMoney(amountCents), canteenBalance, keterangan]
       );
       return {
         santri: { id: santriId, saldo: studentBalance },
         kantin: { id: kantinId, saldo: canteenBalance },
         transaksi_id: transaction.insertId,
+        jumlah: centsToMoney(amountCents),
       };
     });
     if (sale.notFound === 'kantin') return res.status(404).json({ message: 'Data kantin tidak ditemukan.' });
@@ -1055,18 +1250,33 @@ export const createCanteenSale = async (req, res) => {
           Number(previous[0].created_by) === req.user.id &&
           Number(previous[0].santri_id) === santriId &&
           Number(previous[0].kantin_id) === kantinId &&
-          moneyToCents(previous[0].jumlah) === moneyToCents(amount.value) &&
           (previous[0].keterangan ?? null) === keterangan
         ) {
-          return res.status(200).json({
-            message: 'Transaksi sudah diproses sebelumnya.',
-            data: {
-              duplicate: true,
-              transaksi_id: previous[0].id,
-              santri: { id: santriId, saldo: previous[0].saldo_akhir },
-              kantin: { id: kantinId },
-            },
-          });
+          const [previousItems] = await pool.query(
+            'SELECT product_id, quantity FROM canteen_sale_items WHERE transaksi_id = ? ORDER BY product_id',
+            [previous[0].id]
+          );
+          const sameItems = catalogRequest &&
+            previousItems.length === normalizedItems.items.length &&
+            previousItems.every((row, index) =>
+              Number(row.product_id) === normalizedItems.items[index].product_id &&
+              Number(row.quantity) === normalizedItems.items[index].quantity) &&
+            (!expectedCatalogAmount?.value ||
+              moneyToCents(previous[0].jumlah) === moneyToCents(expectedCatalogAmount.value));
+          const sameManualAmount = !catalogRequest && !previousItems.length &&
+            moneyToCents(previous[0].jumlah) === moneyToCents(amount.value);
+          if (sameItems || sameManualAmount) {
+            return res.status(200).json({
+              message: 'Transaksi sudah diproses sebelumnya.',
+              data: {
+                duplicate: true,
+                transaksi_id: previous[0].id,
+                santri: { id: santriId, saldo: previous[0].saldo_akhir },
+                kantin: { id: kantinId },
+                jumlah: previous[0].jumlah,
+              },
+            });
+          }
         }
         if (previous.length) {
           return res.status(409).json({ message: 'Idempotency-Key sudah dipakai untuk transaksi lain.' });
@@ -1087,6 +1297,12 @@ export const createCanteenSale = async (req, res) => {
     }
     if (error.code === 'CANTEEN_BALANCE_LIMIT') {
       return res.status(400).json({ message: 'Saldo kantin melebihi batas maksimum.' });
+    }
+    if (['CATALOG_ITEMS_REQUIRED', 'CATALOG_DISABLED', 'PRODUCT_UNAVAILABLE', 'INSUFFICIENT_PRODUCT_STOCK', 'CATALOG_PRICE_CHANGED'].includes(error.code)) {
+      return res.status(409).json({ message: error.message });
+    }
+    if (error.code === 'SALE_AMOUNT_LIMIT') {
+      return res.status(400).json({ message: error.message });
     }
     console.error('Create canteen sale error:', error);
     return res.status(500).json({ message: 'Gagal mencatat transaksi kantin.' });

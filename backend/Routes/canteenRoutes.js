@@ -6,6 +6,13 @@ import {
   lookupStudent,
 } from '../Controllers/canteenController.js';
 import { createCanteenSale } from '../Controllers/adminController.js';
+import {
+  createCanteenProduct,
+  getCanteenProducts,
+  getCanteenStockMovements,
+  updateAssignedCanteenCatalogMode,
+  updateCanteenProduct,
+} from '../Controllers/canteenCatalogController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import { requireAssignedCanteen } from '../middleware/canteenAccess.js';
 import { auditMutation } from '../middleware/security.js';
@@ -27,6 +34,11 @@ router.post('/pencairan/persetujuan/:id/reject', rejectCanteenPayout);
 router.post('/:id/santri/lookup', requireAssignedCanteen, lookupStudent);
 router.get('/:id', requireAssignedCanteen, getAssignedCanteen);
 router.get('/:id/saldo', requireAssignedCanteen, getAssignedCanteen);
+router.get('/:id/produk', requireAssignedCanteen, getCanteenProducts);
+router.patch('/:id/katalog', requireAssignedCanteen, updateAssignedCanteenCatalogMode);
+router.post('/:id/produk', requireAssignedCanteen, createCanteenProduct);
+router.patch('/:id/produk/:productId', requireAssignedCanteen, updateCanteenProduct);
+router.get('/:id/pergerakan-stok', requireAssignedCanteen, getCanteenStockMovements);
 router.post('/:id/penjualan', requireAssignedCanteen, (req, res, next) => {
   if (typeof req.get('Idempotency-Key') !== 'string' || !req.get('Idempotency-Key').trim()) {
     return res.status(400).json({ message: 'Header Idempotency-Key wajib diisi untuk transaksi kasir.' });

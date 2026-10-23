@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-import { api, ApiError } from './api.js';
+import { api, ApiError, resolveAssetUrl } from './api.js';
 import {
-  AdminLayout, Alert, Brand, Field, Loading, MobileLayout,
+  AdminLayout, Alert, Brand, Field, InstitutionContext, Loading, MobileLayout,
+  setInstitutionTimeZone,
 } from './ui.jsx';
 import {
   AdminApprovals,
@@ -16,15 +17,17 @@ import {
   AdminStudentDetail,
   AdminStudents,
   AdminTransactions,
+  AdminFinancialReports,
   AdminUsers,
+  AdminSettings,
 } from './components/admin/index.js';
-import { CashierAccount, CashierHome, CashierHistory } from './components/cashier/index.js';
-import { ParentHome, ParentHistory, ParentLimit } from './components/parent/index.js';
+import { CashierAccount, CashierCatalogManagement, CashierHome, CashierHistory, CashierPayoutApprovals } from './components/cashier/index.js';
+import { ParentAccount, ParentHome, ParentHistory, ParentLimit, ParentTopup } from './components/parent/index.js';
 
 const TOKEN_KEY = 'pondokpay.access_token';
 const USER_KEY = 'pondokpay.user';
 
-function Login({ onLogin }) {
+function Login({ onLogin, institutionError }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [visible, setVisible] = useState(false);
@@ -72,6 +75,7 @@ function Login({ onLogin }) {
           <span className="badge-green">Portal admin, kasir & wali</span>
           <h2 className="mt-6 text-3xl font-medium sm:text-4xl">Assalamu’alaikum.</h2>
           <p className="mt-2 text-muted">Selamat datang kembali. Masuk untuk melanjutkan.</p>
+          {institutionError && <Alert type="warning" className="mt-5">{institutionError}</Alert>}
           <form className="mt-8 space-y-5" onSubmit={submit}>
             {error && <Alert type="error">{error}</Alert>}
             <Field label="Username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required maxLength={50} />
@@ -160,7 +164,7 @@ function Mfa({ challenge, onComplete, onBack }) {
   );
 }
 
-function SessionRoutes({ session, onLogout }) {
+function SessionRoutes({ session, onLogout, onInstitutionUpdate }) {
   const navigate = useNavigate();
   const user = session.user;
   const token = session.token;
@@ -180,11 +184,13 @@ function SessionRoutes({ session, onLogout }) {
           <Route path="kantin" element={<AdminCanteens token={token} />} />
           <Route path="wali" element={<AdminParents token={token} />} />
           <Route path="transaksi" element={<AdminTransactions token={token} />} />
+          <Route path="reports/financial" element={<AdminFinancialReports token={token} />} />
           <Route path="users" element={<AdminUsers token={token} />} />
           <Route path="credentials" element={<AdminCredentials token={token} />} />
           <Route path="approvals" element={<AdminApprovals token={token} />} />
           <Route path="audit" element={<AdminAudit token={token} />} />
           <Route path="cash" element={<AdminCash token={token} />} />
+          <Route path="settings" element={<AdminSettings token={token} onUpdate={onInstitutionUpdate} />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/admin" replace />} />
@@ -194,9 +200,11 @@ function SessionRoutes({ session, onLogout }) {
   if (user.role === 'kasir') {
     return (
       <Routes>
-        <Route path="/kasir" element={<MobileLayout user={user} basePath="/kasir" onLogout={onLogout}><CashierHome token={token} /></MobileLayout>} />
-        <Route path="/kasir/history" element={<MobileLayout user={user} basePath="/kasir" onLogout={onLogout}><CashierHistory token={token} /></MobileLayout>} />
-        <Route path="/kasir/account" element={<MobileLayout user={user} basePath="/kasir" onLogout={onLogout}><CashierAccount token={token} user={user} onLogout={onLogout} /></MobileLayout>} />
+        <Route path="/kasir" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierHome token={token} /></MobileLayout>} />
+        <Route path="/kasir/history" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierHistory token={token} /></MobileLayout>} />
+        <Route path="/kasir/catalog" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierCatalogManagement token={token} /></MobileLayout>} />
+        <Route path="/kasir/payout-approvals" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierPayoutApprovals token={token} /></MobileLayout>} />
+        <Route path="/kasir/account" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierAccount token={token} user={user} onLogout={onLogout} /></MobileLayout>} />
         <Route path="*" element={<Navigate to="/kasir" replace />} />
       </Routes>
     );
@@ -207,6 +215,8 @@ function SessionRoutes({ session, onLogout }) {
         <Route path="/wali" element={<MobileLayout user={user} basePath="/wali" onLogout={onLogout}><ParentHome token={token} /></MobileLayout>} />
         <Route path="/wali/history" element={<MobileLayout user={user} basePath="/wali" onLogout={onLogout}><ParentHistory token={token} /></MobileLayout>} />
         <Route path="/wali/limit" element={<MobileLayout user={user} basePath="/wali" onLogout={onLogout}><ParentLimit token={token} /></MobileLayout>} />
+        <Route path="/wali/topup" element={<MobileLayout user={user} basePath="/wali" onLogout={onLogout}><ParentTopup token={token} /></MobileLayout>} />
+        <Route path="/wali/account" element={<MobileLayout user={user} basePath="/wali" onLogout={onLogout}><ParentAccount token={token} /></MobileLayout>} />
         <Route path="*" element={<Navigate to="/wali" replace />} />
       </Routes>
     );
@@ -215,6 +225,17 @@ function SessionRoutes({ session, onLogout }) {
 }
 
 export default function App() {
+  const [institution, setInstitution] = useState({
+    name: 'Nama Pondok',
+    app_name: null,
+    address: 'Jl. Contoh No. 123, Kabupaten/Kota',
+    phone: '+62 812-0000-0000',
+    email: 'info@contoh.ponpes.id',
+    manager_name: 'Nama Penanggung Jawab',
+    logo_path: null,
+    timezone: 'Asia/Jakarta',
+  });
+  const [institutionError, setInstitutionError] = useState('');
   const [session, setSession] = useState(() => {
     try {
       const token = sessionStorage.getItem(TOKEN_KEY);
@@ -228,6 +249,32 @@ export default function App() {
   });
   const [challenge, setChallenge] = useState(null);
   const [checking, setChecking] = useState(Boolean(session));
+
+  useEffect(() => {
+    let active = true;
+    api.get('/settings').then((result) => {
+      if (active && result.data) {
+        setInstitutionTimeZone(result.data.timezone);
+        setInstitution(result.data);
+        setInstitutionError('');
+      }
+    }).catch((error) => {
+      console.error('Load public institution settings failed:', error);
+      if (active) setInstitutionError('Profil pondok belum dapat dimuat. Coba muat ulang halaman atau hubungi administrator.');
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    setInstitutionTimeZone(institution.timezone);
+    document.title = institution.app_name || (institution.name ? `${institution.name} · PondokPay` : 'PondokPay');
+    const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    if (appleIcon) appleIcon.href = resolveAssetUrl(institution.logo_path) || '/pwa-icon.svg';
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon) favicon.href = resolveAssetUrl(institution.logo_path) || '/pwa-icon.svg';
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = '#075746';
+  }, [institution]);
 
   useEffect(() => {
     if (!session?.token) return undefined;
@@ -266,8 +313,21 @@ export default function App() {
     setSession(null);
   };
 
-  if (checking) return <Loading label="Memeriksa sesi..." />;
-  if (challenge) return <Mfa challenge={challenge} onComplete={completeLogin} onBack={() => setChallenge(null)} />;
-  if (!session) return <Login onLogin={completeLogin} />;
-  return <SessionRoutes session={session} onLogout={logout} />;
+  const updateInstitution = (settings) => {
+    setInstitutionTimeZone(settings.timezone);
+    setInstitution(settings);
+  };
+
+  if (checking) return <InstitutionContext.Provider value={institution}><Loading label="Memeriksa sesi..." /></InstitutionContext.Provider>;
+  if (challenge) return <InstitutionContext.Provider value={institution}><Mfa challenge={challenge} onComplete={completeLogin} onBack={() => setChallenge(null)} /></InstitutionContext.Provider>;
+  if (!session) return <InstitutionContext.Provider value={institution}><Login onLogin={completeLogin} institutionError={institutionError} /></InstitutionContext.Provider>;
+  return (
+    <InstitutionContext.Provider value={institution}>
+      <SessionRoutes
+        session={session}
+        onLogout={logout}
+        onInstitutionUpdate={updateInstitution}
+      />
+    </InstitutionContext.Provider>
+  );
 }

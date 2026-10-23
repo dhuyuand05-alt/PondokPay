@@ -9,3 +9,5 @@ export { AdminCredentials } from './Credentials.jsx';
 export { AdminApprovals } from './approvals.jsx';
 export { AdminAudit } from './Audit.jsx';
 export { AdminCash } from './Cash.jsx';
+export { AdminSettings } from './Settings.jsx';
+export { AdminFinancialReports } from './FinancialReports.jsx';

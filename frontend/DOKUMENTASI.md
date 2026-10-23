@@ -9,7 +9,8 @@ Frontend adalah aplikasi single-page berbasis React 18, React Router, Vite, Tail
 Peran yang memiliki antarmuka saat ini:
 
 - **Admin:** dashboard dan pengelolaan data serta operasi pondok.
-- **Kasir:** verifikasi santri, input dan konfirmasi pembelian, akun, serta riwayat kantin.
+- **Kasir:** verifikasi santri, transaksi nominal atau POS produk per transaksi, katalog dan stok kantin yang ditugaskan, pencarian SKU/barcode (termasuk scanner keyboard), konfirmasi pembayaran, akun, serta riwayat kantin.
+- **Admin:** pengelolaan kantin dan rekap nilai transaksi tanpa rincian produk; katalog, harga, dan stok dikelola oleh kasir kantin.
 - **Wali:** ringkasan anak, transaksi, dan pengaturan limit harian.
 
 Peran `santri` belum mempunyai halaman khusus. Jika akun tersebut login, aplikasi menampilkan pesan bahwa halaman belum tersedia dan menyediakan tindakan keluar.
@@ -100,11 +101,19 @@ Prefix halaman: `/admin`.
 | `/admin/kantin` | Pengelolaan kantin, penugasan kasir, transaksi, dan pencairan |
 | `/admin/wali` | Akun wali dan relasi dengan anak |
 | `/admin/transaksi` | Riwayat transaksi |
+| `/admin/reports/financial` | Filter periode, santri, dan kantin; ringkasan finansial, tren belanja harian, rekap transaksi, dan ekspor CSV/PDF |
 | `/admin/users` | Pengelolaan akun dan role |
 | `/admin/credentials` | Kelola kredensial RFID/fingerprint |
 | `/admin/approvals` | Ajukan, setujui, atau tolak persetujuan finansial sesuai peran admin |
 | `/admin/audit` | Log aktivitas untuk pemantauan |
 | `/admin/cash` | Atur tarif layanan bulanan, pantau kas, catat pengeluaran, dan buat koreksi append-only |
+| `/admin/settings` | Atur nama pondok, nama aplikasi PWA, alamat, kontak, penanggung jawab, zona waktu, dan logo untuk instalasi ini |
+
+Profil pondok disimpan pada database instalasi aktif; pemasangan terpisah menggunakan profil dan database masing-masing. Nama dan logo digunakan pada branding aplikasi, sedangkan zona waktu memengaruhi tampilan tanggal. Nama aplikasi dan logo juga menjadi identitas aplikasi PWA yang dapat dipasang admin, kasir, dan wali melalui tombol **Pasang aplikasi**. Logo PNG/JPG/WebP maksimal 2 MB disimpan di direktori backend `UPLOAD_DIR`, yang harus dipersistenkan saat deployment.
+
+PWA menggunakan manifest publik `GET /api/settings/manifest.webmanifest` dan service worker frontend `/sw.js`. Instalasi membutuhkan HTTPS (kecuali localhost) serta frontend dan API pada origin yang sama. PWA tidak menghasilkan file APK; pada browser yang tidak menyediakan prompt instalasi, ikuti petunjuk **Tambahkan ke layar utama** yang ditampilkan oleh tombol pemasangan.
+
+Admin menghubungkan WhatsApp pada halaman pengaturan dengan memindai QR melalui menu Perangkat tertaut pada ponsel. Gunakan nomor khusus bot; Baileys merupakan integrasi tidak resmi dan sesi dapat terputus atau dibatasi. Wali mengatur nomor dan memulai verifikasi dengan membuka tautan WhatsApp berisi kode sekali pakai, lalu mengirim pesannya sendiri.
 
 ### Kasir
 
@@ -127,8 +136,11 @@ Prefix halaman: `/wali`.
 | `/wali` | Anak terhubung, saldo, limit harian, dan transaksi terbaru |
 | `/wali/history` | Riwayat transaksi anak yang dipilih |
 | `/wali/limit` | Perubahan limit belanja harian |
+| `/wali/topup` | Top-up digital melalui QRIS Midtrans, status pembayaran, dan riwayat |
+| `/wali/account` | Mengatur nomor WhatsApp dan verifikasi opt-in notifikasi transaksi |
 
 Data anak dan izin memperbarui limit dibatasi server hanya pada relasi wali tersebut.
+Notifikasi WhatsApp hanya aktif setelah wali membuka tautan pesan terisi otomatis dan mengirim kode verifikasi dari nomor yang didaftarkan. Pesan transaksi hanya dikirim untuk belanja, top-up, dan penarikan saldo anak. Folder sesi WhatsApp backend harus disimpan persisten dan dijaga aksesnya sebagai kredensial rahasia.
 
 ## 7. Klien API dan penanganan error
 
@@ -162,7 +174,7 @@ Backend dapat meminta approval finansial untuk nominal tertentu. Jika response m
 
 Menu **Persetujuan finansial** menyediakan tiga daftar: permintaan admin lain yang masih berlaku dan perlu ditinjau, permintaan yang dibuat admin saat ini, serta riwayat keputusan/approval kedaluwarsa. Pilih entri untuk membuka detail target, nominal, keterangan, pengaju, approver, batas waktu, dan waktu penggunaan bila sudah dikonsumsi. Tombol setujui/tolak hanya ditampilkan jika backend menyatakan `can_decide`; backend tetap memvalidasi lagi agar peminta tidak dapat menyetujui permintaannya sendiri dan permintaan kedaluwarsa tidak dapat diputuskan. Setelah disetujui, peminta masih harus mengirim transaksi yang cocok sebelum approval kedaluwarsa.
 
-Menu **Kas admin** menampilkan pemasukan biaya layanan yang benar-benar tertagih, pengeluaran operasional, saldo kas bersih, dan tunggakan bulan berjalan. Tarif berlaku untuk semua santri aktif mulai bulan berikutnya. Pengeluaran tidak dapat dihapus atau diubah; koreksi membalik nilai penuh catatan dan mempertahankan riwayat aslinya.
+Menu **Kas admin** menampilkan pemasukan biaya layanan yang benar-benar tertagih, pemasukan luar, pengeluaran operasional, saldo kas bersih, dan tunggakan bulan berjalan. Pemasukan luar hanya dicatat setelah dana benar-benar diterima dan harus mencantumkan sumber serta keterangan. Pengeluaran dan koreksi yang mengurangi saldo ditolak jika kas tidak cukup. Tarif biaya layanan berlaku untuk semua santri aktif mulai bulan berikutnya. Catatan kas tidak dapat dihapus atau diubah; koreksi membalik nilai penuh catatan dan mempertahankan riwayat aslinya.
 
 ## 10. Tampilan responsif dan komponen
 

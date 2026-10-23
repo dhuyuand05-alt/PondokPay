@@ -1,12 +1,18 @@
 import express from 'express';
 import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getFinancialApprovalThreshold, getJwtSecret, getMfaEncryptionKey } from './config/security.js';
 import authRoutes from './Routes/authRoutes.js';
 import userRoutes from './Routes/userRoutes.js';
 import adminRoutes from './Routes/adminRoutes.js';
 import canteenRoutes from './Routes/canteenRoutes.js';
 import parentRoutes from './Routes/parentRoutes.js';
+import settingsRoutes from './Routes/settingsRoutes.js';
+import { handleMidtransNotification } from './Controllers/midtransController.js';
 import pool, { ensureAdminSchema } from './config/db.js';
+import { startWhatsAppNotificationWorker } from './services/whatsappNotifications.js';
+import { resumeWhatsAppSession } from './services/whatsappBot.js';
 import {
   rateLimitApi,
   requireHttpsInProduction,
@@ -15,6 +21,9 @@ import {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const uploadDirectory = process.env.UPLOAD_DIR
+  ? path.resolve(process.env.UPLOAD_DIR)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'uploads');
 
 const proxyHops = process.env.TRUST_PROXY_HOPS;
 if (proxyHops !== undefined && (!/^\d+$/.test(proxyHops) || Number(proxyHops) > 5)) {
@@ -25,10 +34,20 @@ app.disable('x-powered-by');
 app.use(securityHeaders);
 app.use(requireHttpsInProduction);
 app.use(rateLimitApi);
+app.use('/api/uploads', express.static(uploadDirectory, {
+  dotfiles: 'deny',
+  index: false,
+  maxAge: '1y',
+  immutable: true,
+}));
 app.use(express.json({ limit: '32kb', strict: true }));
 app.use((req, res, next) => {
+  const isLogoUpload = req.method === 'POST' &&
+    req.path === '/api/admin/settings/logo' &&
+    req.is('multipart/form-data');
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) &&
-      Number(req.get('content-length') ?? 0) > 0 && !req.is('application/json')) {
+      Number(req.get('content-length') ?? 0) > 0 &&
+      !req.is('application/json') && !isLogoUpload) {
     return res.status(415).json({ message: 'Request body harus menggunakan application/json.' });
   }
   req.body ??= {};
@@ -41,6 +60,7 @@ app.get('/', (req, res) => {
     endpoints: {
       login: 'POST /api/auth/login',
       profile: 'GET /api/auth/me',
+      institution: 'GET /api/settings',
       users: 'GET /api/users',
       adminDashboard: 'GET /api/admin/dashboard',
       adminSantri: '/api/admin/santri',
@@ -52,6 +72,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/settings', settingsRoutes);
+app.post('/api/midtrans/notification', handleMidtransNotification);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/kantin', canteenRoutes);
@@ -85,6 +107,8 @@ const startServer = async () => {
       await ensureAdminSchema();
     }
     await pool.query('SELECT 1');
+    await resumeWhatsAppSession();
+    startWhatsAppNotificationWorker();
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server is running on port ${PORT}`);
       console.log('Admin APIs are ready.');
