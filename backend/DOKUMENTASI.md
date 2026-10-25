@@ -88,16 +88,23 @@ Pada produksi, backend mewajibkan TLS untuk request, `DB_SSL_CA`, serta `DB_AUTO
 |---|---|
 | `index.mjs` | Konfigurasi Express, middleware global, route mounting, pengecekan konfigurasi, dan startup |
 | `Routes/` | Pemetaan URL/method ke controller dan middleware akses |
-| `Controllers/` | Implementasi handler autentikasi, admin, kasir, wali, dan akun |
+| `Routes/adminRoutes/` | Route admin yang dikelompokkan berdasarkan dashboard, laporan, kas, santri, kantin, wali, dan kredensial |
+| `Controllers/admin/` | Handler admin berdasarkan domain; helper bersama berada di `shared.js` |
+| `Controllers/admin/transactions/` | Riwayat transaksi, top-up/penarikan santri, penjualan, dan pencairan kantin |
+| `Controllers/admin/wali/` | Pengelolaan akun wali, relasi santri, dan profil wali |
+| `Controllers/adminFinance/` | Handler ringkasan kas, catatan kas, dan biaya layanan |
+| `Controllers/financialReport/` | Pengambilan data laporan, ekspor CSV/PDF, dan handler laporan |
+| `Controllers/midtrans/` | Pengaturan Midtrans, top-up wali, pembaruan status, dan notifikasi pembayaran |
+| `Controllers/` | Handler autentikasi, kasir, wali, pengaturan, dan akun |
 | `middleware/auth.js` | Verifikasi token, status sesi, dan role |
 | `middleware/security.js` | Header keamanan, HTTPS produksi, rate limit, dan audit mutasi |
 | `middleware/canteenAccess.js` | Pembatasan akses kasir berdasarkan penugasan kantin |
-| `config/db.js` | Pool MySQL dan helper setup/migrasi skema |
+| `config/db.js` dan `config/pool.js` | Ekspor pool MySQL serta urutan setup skema |
+| `config/dbSchema/` | Setup skema berdasarkan kelompok tabel dan tanggung jawab |
 | `config/security.js` | Validasi kunci, enkripsi secret MFA, serta fungsi TOTP |
 | `config/passwords.js` | Validasi aturan password |
 | `services/financialApprovals.js` | Permintaan, keputusan, masa berlaku, dan konsumsi approval finansial |
 | `services/midtrans.js` | Integrasi Snap/QRIS, validasi signature dan status transaksi Midtrans |
-| `Controllers/midtransController.js` | Pengaturan admin, API top-up wali, webhook, dan pencocokan saldo |
 | `scripts/` | Migrasi skema, provisioning admin, backup, dan restore |
 | `sql/` | SQL pendukung API dan tabel akun |
 | `test/` | Tes keamanan otomatis berbasis `node:test` |
