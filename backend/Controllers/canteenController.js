@@ -78,11 +78,18 @@ export const lookupStudent = async (req, res) => {
               COALESCE(daily.total, 0) AS belanja_hari_ini
        FROM ${isCredentialLookup ? 'credentials_auth c JOIN santri s ON s.id = c.santri_id' : 'santri s'}
        LEFT JOIN (
-         SELECT santri_id, SUM(jumlah) AS total
-         FROM transaksi
-         WHERE tipe_transaksi = 'belanja'
-           AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
-         GROUP BY santri_id
+         SELECT t.santri_id,
+                GREATEST(SUM(CASE
+                  WHEN t.tipe_transaksi = 'belanja' THEN t.jumlah
+                  WHEN original.created_at >= CURDATE()
+                    AND original.created_at < CURDATE() + INTERVAL 1 DAY THEN -t.jumlah
+                  ELSE 0 END), 0) AS total
+         FROM transaksi t
+         LEFT JOIN canteen_sale_refunds cr ON cr.refund_transaksi_id = t.id
+         LEFT JOIN transaksi original ON original.id = cr.original_transaksi_id
+         WHERE t.tipe_transaksi IN ('belanja', 'refund_belanja')
+           AND t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY
+         GROUP BY t.santri_id
        ) daily ON daily.santri_id = s.id
        ${isCredentialLookup
         ? `WHERE ${credentialColumn} = ? AND c.status = 'active' AND s.is_active = TRUE`
@@ -119,7 +126,7 @@ export const getCanteenTransactions = async (req, res) => {
   const values = [canteenId];
 
   if (req.query.tipe_transaksi !== undefined) {
-    if (!['penjualan', 'pencairan'].includes(req.query.tipe_transaksi)) {
+    if (!['penjualan', 'pencairan', 'refund'].includes(req.query.tipe_transaksi)) {
       return res.status(400).json({ message: 'Jenis transaksi kantin tidak valid.' });
     }
     conditions.push('kt.tipe_transaksi = ?');
@@ -134,17 +141,23 @@ export const getCanteenTransactions = async (req, res) => {
     );
     const [rows] = await pool.query(
       `SELECT kt.id, kt.transaksi_id, kt.tipe_transaksi, kt.jumlah,
-              kt.saldo_akhir, kt.keterangan, kt.created_at,
-              s.id AS santri_id, s.nis, s.nama_lengkap
+              kt.saldo_akhir, kt.keterangan, kt.created_at, t.created_by AS cashier_id,
+              s.id AS santri_id, s.nis, s.nama_lengkap,
+              ref.original_transaksi_id AS refunded_sale_id,
+              ref.reason AS refund_reason, ref.restocked,
+              sale_ref.id AS refund_id, sale_ref.cashier_id AS refund_cashier_id
        FROM kantin_transaksi kt
        LEFT JOIN transaksi t ON t.id = kt.transaksi_id
+       LEFT JOIN canteen_sale_refunds ref ON ref.refund_transaksi_id = kt.transaksi_id
+       LEFT JOIN canteen_sale_refunds sale_ref
+         ON sale_ref.original_transaksi_id = COALESCE(ref.original_transaksi_id, kt.transaksi_id)
        LEFT JOIN santri s ON s.id = t.santri_id
        ${where}
        ORDER BY kt.created_at DESC, kt.id DESC LIMIT ? OFFSET ?`,
       [...values, limit, offset]
     );
     const transactionIds = rows
-      .map((row) => row.transaksi_id)
+      .map((row) => row.refunded_sale_id || row.transaksi_id)
       .filter((transactionId) => transactionId !== null);
     if (transactionIds.length) {
       const [items] = await pool.query(

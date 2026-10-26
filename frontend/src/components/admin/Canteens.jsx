@@ -19,6 +19,7 @@ import {
   TextAreaField,
 } from '../../ui.jsx';
 import { ActionForm, typeName } from './shared.jsx';
+import { CanteenOperations } from './CanteenOperations.jsx';
 
 export function AdminCanteens({ token }) {
   const [selectedId, setSelectedId] = useState('');
@@ -410,6 +411,7 @@ export function AdminCanteens({ token }) {
               </aside>
             )}
           </div>
+          {selected && <CanteenOperations token={token} canteenId={selected.id} cashiers={cashiers} />}
         </>
       )}
       {(modal === 'create' || modal === 'edit') && (

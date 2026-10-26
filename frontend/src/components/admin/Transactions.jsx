@@ -92,7 +92,7 @@ export function AdminTransactions({ token }) {
               </p>
             </td>
             <td className="table-cell whitespace-nowrap font-semibold">
-              {item.tipe_transaksi === 'topup' ? '+' : '−'}
+              {['topup', 'refund_belanja'].includes(item.tipe_transaksi) ? '+' : '−'}
               {formatMoney(item.jumlah)}
             </td>
             <td className="table-cell whitespace-nowrap">{formatMoney(item.saldo_akhir)}</td>

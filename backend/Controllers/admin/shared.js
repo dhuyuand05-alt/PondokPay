@@ -1,7 +1,7 @@
 import pool from '../../config/db.js';
 
 export const validCredentialStatuses = ['active', 'blocked'];
-export const validTransactionTypes = ['belanja', 'topup', 'tarik', 'biaya_layanan'];
+export const validTransactionTypes = ['belanja', 'refund_belanja', 'topup', 'tarik', 'biaya_layanan'];
 export const maxPageSize = 100;
 
 export const parseId = (value) => {

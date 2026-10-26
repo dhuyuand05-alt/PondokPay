@@ -12,7 +12,7 @@ export const enqueueParentTransactionNotifications = async (connection, transact
      JOIN wali_santri w ON w.santri_id = t.santri_id
      JOIN users u ON u.id = w.user_id AND u.role = 'wali' AND u.is_active = TRUE
      JOIN parent_notification_settings pns ON pns.user_id = u.id
-     WHERE t.id = ? AND t.tipe_transaksi IN ('belanja', 'topup', 'tarik')
+     WHERE t.id = ? AND t.tipe_transaksi IN ('belanja', 'refund_belanja', 'topup', 'tarik')
        AND pns.verified_at IS NOT NULL`,
     [transactionId, transactionId]
   );
@@ -86,6 +86,7 @@ const sendQueuedNotification = async (id) => {
     }).format(new Date(notification.created_at));
     const typeName = {
       belanja: 'Belanja',
+      refund_belanja: 'Pengembalian belanja',
       topup: 'Top-up saldo',
       tarik: 'Penarikan saldo',
     }[notification.tipe_transaksi];

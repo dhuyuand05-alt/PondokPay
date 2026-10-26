@@ -46,11 +46,18 @@ export const getParentProfile = async (req, res) => {
        FROM wali_santri w
        JOIN santri s ON s.id = w.santri_id
        LEFT JOIN (
-         SELECT santri_id, SUM(jumlah) AS total
-         FROM transaksi
-         WHERE tipe_transaksi = 'belanja'
-           AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
-         GROUP BY santri_id
+         SELECT t.santri_id,
+                GREATEST(SUM(CASE
+                  WHEN t.tipe_transaksi = 'belanja' THEN t.jumlah
+                  WHEN original.created_at >= CURDATE()
+                    AND original.created_at < CURDATE() + INTERVAL 1 DAY THEN -t.jumlah
+                  ELSE 0 END), 0) AS total
+         FROM transaksi t
+         LEFT JOIN canteen_sale_refunds cr ON cr.refund_transaksi_id = t.id
+         LEFT JOIN transaksi original ON original.id = cr.original_transaksi_id
+         WHERE t.tipe_transaksi IN ('belanja', 'refund_belanja')
+           AND t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY
+         GROUP BY t.santri_id
        ) daily ON daily.santri_id = s.id
        WHERE w.user_id = ?
        ORDER BY s.nama_lengkap`,
@@ -166,11 +173,18 @@ export const getChildren = async (req, res) => {
        FROM wali_santri w
        JOIN santri s ON s.id = w.santri_id
        LEFT JOIN (
-         SELECT santri_id, SUM(jumlah) AS total
-         FROM transaksi
-         WHERE tipe_transaksi = 'belanja'
-           AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
-         GROUP BY santri_id
+         SELECT t.santri_id,
+                GREATEST(SUM(CASE
+                  WHEN t.tipe_transaksi = 'belanja' THEN t.jumlah
+                  WHEN original.created_at >= CURDATE()
+                    AND original.created_at < CURDATE() + INTERVAL 1 DAY THEN -t.jumlah
+                  ELSE 0 END), 0) AS total
+         FROM transaksi t
+         LEFT JOIN canteen_sale_refunds cr ON cr.refund_transaksi_id = t.id
+         LEFT JOIN transaksi original ON original.id = cr.original_transaksi_id
+         WHERE t.tipe_transaksi IN ('belanja', 'refund_belanja')
+           AND t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY
+         GROUP BY t.santri_id
        ) daily ON daily.santri_id = s.id
        WHERE w.user_id = ?
        ORDER BY s.nama_lengkap`,
@@ -190,10 +204,16 @@ export const getChildDetails = async (req, res) => {
     const child = await getLinkedChild(req.user.id, santriId);
     if (!child) return res.status(404).json({ message: 'Santri tidak terhubung ke akun orang tua ini.' });
     const [[daily]] = await pool.query(
-      `SELECT COALESCE(SUM(jumlah), 0) AS total
-       FROM transaksi
-       WHERE santri_id = ? AND tipe_transaksi = 'belanja'
-         AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY`,
+      `SELECT GREATEST(COALESCE(SUM(CASE
+           WHEN t.tipe_transaksi = 'belanja' THEN t.jumlah
+           WHEN original.created_at >= CURDATE()
+             AND original.created_at < CURDATE() + INTERVAL 1 DAY THEN -t.jumlah
+           ELSE 0 END), 0), 0) AS total
+       FROM transaksi t
+       LEFT JOIN canteen_sale_refunds cr ON cr.refund_transaksi_id = t.id
+       LEFT JOIN transaksi original ON original.id = cr.original_transaksi_id
+       WHERE t.santri_id = ? AND t.tipe_transaksi IN ('belanja', 'refund_belanja')
+         AND t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY`,
       [santriId]
     );
     const dailySpend = Number(daily.total ?? 0);
@@ -216,7 +236,7 @@ export const getChildTransactions = async (req, res) => {
   const { page, limit } = parsePagination(req.query);
   const offset = (page - 1) * limit;
   const transactionType = req.query.tipe_transaksi;
-  if (transactionType !== undefined && !['belanja', 'topup', 'tarik'].includes(transactionType)) {
+  if (transactionType !== undefined && !['belanja', 'refund_belanja', 'topup', 'tarik'].includes(transactionType)) {
     return res.status(400).json({ message: 'Tipe transaksi tidak valid.' });
   }
   const filter = transactionType ? 'AND tipe_transaksi = ?' : '';
@@ -278,10 +298,16 @@ export const updateChildDailyLimit = async (req, res) => {
     }
     await connection.query('UPDATE santri SET limit_harian = ? WHERE id = ?', [limit.toFixed(2), santriId]);
     const [[daily]] = await connection.query(
-      `SELECT COALESCE(SUM(jumlah), 0) AS total
-       FROM transaksi
-       WHERE santri_id = ? AND tipe_transaksi = 'belanja'
-         AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY`,
+      `SELECT GREATEST(COALESCE(SUM(CASE
+           WHEN t.tipe_transaksi = 'belanja' THEN t.jumlah
+           WHEN original.created_at >= CURDATE()
+             AND original.created_at < CURDATE() + INTERVAL 1 DAY THEN -t.jumlah
+           ELSE 0 END), 0), 0) AS total
+       FROM transaksi t
+       LEFT JOIN canteen_sale_refunds cr ON cr.refund_transaksi_id = t.id
+       LEFT JOIN transaksi original ON original.id = cr.original_transaksi_id
+       WHERE t.santri_id = ? AND t.tipe_transaksi IN ('belanja', 'refund_belanja')
+         AND t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY`,
       [santriId]
     );
     await connection.commit();

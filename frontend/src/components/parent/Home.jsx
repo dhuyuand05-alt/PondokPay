@@ -200,9 +200,9 @@ export function ParentHome({ token }) {
                           </p>
                         </div>
                         <p
-                          className={`whitespace-nowrap text-xs font-semibold tabular-nums ${item.tipe_transaksi === 'topup' ? 'text-pondok-600' : 'text-ink'}`}
+                          className={`whitespace-nowrap text-xs font-semibold tabular-nums ${['topup', 'refund_belanja'].includes(item.tipe_transaksi) ? 'text-pondok-600' : 'text-ink'}`}
                         >
-                          {item.tipe_transaksi === 'topup' ? '+' : '−'}
+                          {['topup', 'refund_belanja'].includes(item.tipe_transaksi) ? '+' : '−'}
                           {formatMoney(item.jumlah)}
                         </p>
                       </div>

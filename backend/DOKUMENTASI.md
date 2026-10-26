@@ -120,7 +120,7 @@ Integrasi notifikasi wali menggunakan Baileys: admin menghubungkan perangkat dar
 
 Baileys adalah library tidak resmi untuk protokol WhatsApp Web, bukan layanan WhatsApp resmi. Koneksi dapat terputus dan akun dapat dibatasi; gunakan nomor khusus bot, patuhi ketentuan WhatsApp, dan kirim hanya notifikasi yang disetujui wali. Data sesi adalah kredensial sensitif; perlakukan sebagai rahasia dan jangan salin ke lingkungan lain.
 
-Migrasi skema mengosongkan token Fonnte lama jika masih tersimpan, menyiapkan kolom kredensial Midtrans dan tabel pesanan QRIS, menambahkan nama aplikasi PWA, serta menambahkan pengaturan katalog dan tabel produk, rincian penjualan, serta pergerakan stok. Untuk instalasi produksi, jalankan `npm run migrate` dengan kredensial migrasi sebelum menjalankan versi backend ini.
+Migrasi skema mengosongkan token Fonnte lama jika masih tersimpan, menyiapkan kolom kredensial Midtrans dan tabel pesanan QRIS, menambahkan nama aplikasi PWA, serta menyiapkan skema POS kantin termasuk snapshot HPP, pemasok, faktur penerimaan stok, utang, dan pembayaran eksternal. Pembayaran pemasok tidak mengubah saldo/ledger kantin. Untuk instalasi produksi, backup database terlebih dahulu, lalu jalankan `npm run migrate` dengan kredensial migrasi sebelum menjalankan versi backend ini. Migrasi produksi tidak dijalankan otomatis oleh startup.
 
 ## 6. Migrasi dan provisioning admin
 
@@ -137,7 +137,7 @@ Untuk database kosong yang baru dibuat, jalankan installer SQL terlebih dahulu d
 mysql -u root -p < sql/install.sql
 ```
 
-Installer membuat database `db_cashless_santri`, seluruh tabel operasional, indeks, foreign key, dan trigger append-only. Script migrasi Node menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian memastikan/memperbarui skema termasuk menambahkan kolom idempotensi yang belum ada pada ledger kas lama. Pada produksi, jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
+Installer membuat database `db_cashless_santri`, seluruh tabel operasional, indeks, foreign key, dan trigger append-only. Script migrasi Node menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian memastikan/memperbarui skema termasuk menambahkan kolom idempotensi yang belum ada pada ledger kas lama serta tabel POS, pembelian, dan pembayaran pemasok. Pada produksi, backup database dan jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
 
 Provision admin awal sesudah migrasi:
 

@@ -25,7 +25,7 @@ Dokumen ini menjelaskan kontrak API kantin yang tersedia untuk aplikasi admin da
 - Timestamp mengikuti serialisasi JSON dari backend, umumnya ISO-8601, misalnya `"2026-10-23T06:00:00.000Z"`.
 - Daftar transaksi mendukung `page` dan `limit`: default `page=1`, `limit=20`, maksimum `limit=100`.
 - Status kantin: `active`, `inactive`.
-- Tipe transaksi kantin: `penjualan`, `pencairan`.
+- Tipe transaksi kantin: `penjualan`, `pencairan`, `refund`.
 - Referensi API lain: [API_DOCUMENTATION.md](./API_DOCUMENTATION.md).
 
 ## Hak akses dan perbedaan tampilan
@@ -42,6 +42,10 @@ Dokumen ini menjelaskan kontrak API kantin yang tersedia untuk aplikasi admin da
 | Melihat detail produk pada riwayat | Tidak | Ya |
 | Mengajukan pencairan saldo | Ya | Tidak |
 | Menyetujui / menolak pengajuan pencairan admin | Tidak | Ya, jika ditugaskan dan MFA aktif |
+| Membuka / menutup giliran kasir | Tidak | Ya |
+| Menahan keranjang POS lintas perangkat pada akun yang sama | Tidak | Ya |
+| Memproses refund penuh dengan alasan | Tidak | Ya, oleh kasir pencatat transaksi asal |
+| Melihat laporan penjualan dan ekspor CSV | Ya | Tidak |
 
 Admin melihat jumlah dan nilai transaksi saja. Endpoint admin tidak mengembalikan rincian item produk. Nama item, harga snapshot, kuantitas, dan subtotal hanya tersedia pada alur kasir.
 
@@ -63,6 +67,9 @@ Semua endpoint pada bagian ini memerlukan role `admin` dan prefix `/api/admin`.
 | `DELETE` | `/api/admin/kantin/:id/kasir/:userId` | Mencabut penugasan kasir |
 | `POST` | `/api/admin/kantin/:id/penjualan` | Mencatat transaksi nominal manual |
 | `GET` | `/api/admin/kantin/:id/transaksi` | Riwayat saldo kantin |
+| `GET` | `/api/admin/kantin/:id/laporan` | Laporan penjualan/refund dengan filter tanggal, kasir, dan produk |
+| `GET` | `/api/admin/kantin/:id/giliran` | Riwayat giliran kasir |
+| `GET` | `/api/admin/kantin/:id/produk` | Katalog untuk filter laporan |
 | `GET` | `/api/admin/kantin/:id/pencairan/persetujuan-kasir` | Melihat status persetujuan kasir atas pencairan |
 | `POST` | `/api/admin/kantin/:id/pencairan/persetujuan-kasir` | Meminta konfirmasi kasir untuk pencairan |
 | `POST` | `/api/admin/kantin/:id/pencairan` | Mencairkan saldo setelah persetujuan |
@@ -370,14 +377,73 @@ Semua endpoint bagian ini memerlukan role `kasir`. Base path: `/api/kantin`. End
 | `PATCH` | `/api/kantin/:id/katalog` | Mengubah mode katalog untuk kantin |
 | `GET` | `/api/kantin/:id/produk` | Daftar semua produk untuk pengelolaan |
 | `POST` | `/api/kantin/:id/produk` | Menambahkan produk |
-| `PATCH` | `/api/kantin/:id/produk/:productId` | Memperbarui produk, status, atau stok |
+| `PATCH` | `/api/kantin/:id/produk/:productId` | Memperbarui data produk, harga, minimum stok, atau status |
+| `POST` | `/api/kantin/:id/produk/:productId/stok` | Penerimaan atau penyesuaian stok beralasan |
 | `GET` | `/api/kantin/:id/pergerakan-stok` | Riwayat pergerakan stok |
+| `GET` | `/api/kantin/:id/pemasok` | Daftar pemasok kantin |
+| `POST` | `/api/kantin/:id/pemasok` | Menambahkan pemasok |
+| `PATCH` | `/api/kantin/:id/pemasok/:supplierId` | Memperbarui kontak atau status pemasok |
+| `GET` | `/api/kantin/:id/pembelian` | Daftar faktur, pembayaran, dan sisa utang |
+| `POST` | `/api/kantin/:id/pembelian` | Menerima faktur, menambah stok, dan mencatat utang |
+| `GET` | `/api/kantin/:id/pembelian/:purchaseId` | Detail faktur dan riwayat pembayaran |
+| `POST` | `/api/kantin/:id/pembelian/:purchaseId/pembayaran` | Mencatat pembayaran tunai/transfer eksternal |
+| `GET` | `/api/kantin/:id/giliran/aktif` | Giliran aktif dan rekap sementara |
+| `GET` | `/api/kantin/:id/giliran/riwayat` | Riwayat giliran kasir |
+| `POST` | `/api/kantin/:id/giliran/buka` | Membuka giliran sebelum penjualan |
+| `POST` | `/api/kantin/:id/giliran/:shiftId/tutup` | Menutup giliran dan mengembalikan rekap |
+| `GET` | `/api/kantin/:id/keranjang-tertahan` | Keranjang tersimpan milik kasir |
+| `POST` | `/api/kantin/:id/keranjang-tertahan` | Menahan keranjang |
+| `PUT` | `/api/kantin/:id/keranjang-tertahan/:cartId` | Memperbarui keranjang tertahan |
+| `DELETE` | `/api/kantin/:id/keranjang-tertahan/:cartId` | Menghapus keranjang tertahan |
 | `POST` | `/api/kantin/:id/santri/lookup` | Memverifikasi santri |
 | `POST` | `/api/kantin/:id/penjualan` | Menyimpan transaksi manual atau POS |
-| `GET` | `/api/kantin/:id/transaksi` | Riwayat transaksi dengan rincian produk |
+| `POST` | `/api/kantin/:id/transaksi/:transactionId/refund` | Refund penuh untuk transaksi kasir |
+| `GET` | `/api/kantin/:id/transaksi` | Riwayat penjualan, refund, dan pencairan |
 | `GET` | `/api/kantin/pencairan/persetujuan` | Daftar pengajuan pencairan yang perlu diputuskan |
 | `POST` | `/api/kantin/pencairan/persetujuan/:id/approve` | Menyetujui pengajuan pencairan |
 | `POST` | `/api/kantin/pencairan/persetujuan/:id/reject` | Menolak pengajuan pencairan |
+
+### Pemasok, faktur, dan pembayaran
+
+Semua operasi pemasok dan pembelian hanya tersedia untuk kasir yang ditugaskan pada kantin di URL. Kasir dapat membuat/mengubah pemasok, menerima faktur, dan mencatat beberapa pembayaran untuk satu faktur.
+
+`GET /api/kantin/:id/pemasok` hanya menampilkan pemasok aktif. Tambahkan `?include_inactive=true` untuk menyertakan pemasok nonaktif. `POST` menerima `name` (wajib) serta `contact_name`, `phone`, `email`, `address`, dan `notes` (opsional). `PATCH` menerima subset field tersebut atau `is_active` bertipe boolean. Pemasok yang dinonaktifkan tetap dapat ditemukan pada faktur lama, tetapi tidak dapat dipilih untuk penerimaan faktur baru.
+
+`POST /api/kantin/:id/pembelian` memerlukan header `Idempotency-Key` unik (8–64 karakter). Penerimaan faktur dan penambahan stok adalah satu transaksi database: kegagalan validasi atau penyimpanan membatalkan seluruh perubahan. Nomor faktur harus unik untuk pemasok yang sama di kantin tersebut.
+
+Request:
+
+```json
+{
+  "supplier_id": 8,
+  "invoice_number": "INV-2026-031",
+  "invoice_date": "2026-10-23",
+  "due_date": "2026-11-22",
+  "note": "Pengiriman mingguan",
+  "items": [
+    { "product_id": 23, "quantity": 24, "unit_cost": "3500.00" }
+  ]
+}
+```
+
+Harga pokok produk dihitung dengan rata-rata tertimbang berdasarkan stok dan nilai yang telah diketahui, tanpa mengubah harga jual. Stok awal dan penambahan stok manual tanpa harga modal menandai biaya produk sebagai tidak diketahui; status ini baru pulih setelah stok tersebut habis dan penerimaan berfaktur berikutnya memberikan basis biaya baru. Sistem tidak mengarang biaya historis. Snapshot HPP disimpan pada item penjualan baru. Penjualan lama dan transaksi nominal manual tidak memiliki margin yang dapat dipastikan.
+
+`POST /api/kantin/:id/pembelian/:purchaseId/pembayaran` juga mewajibkan `Idempotency-Key`. `amount` harus positif dan tidak boleh melebihi saldo utang. Pembayaran sebagian dapat dilakukan berkali-kali. `method` bernilai `cash`, `bank_transfer`, atau `other`; `reference_code` dan `note` opsional.
+
+Request:
+
+```json
+{
+  "amount": "25000.00",
+  "method": "bank_transfer",
+  "reference_code": "TRF-7781",
+  "note": "Cicilan pertama"
+}
+```
+
+Response berhasil mencakup catatan pembayaran, `outstanding` setelah pembayaran, dan `balance_effect: "external_cash_or_bank_only"`. `GET /api/kantin/:id/pembelian` mengembalikan `data`, ringkasan total faktur/pembayaran/utang, serta `pagination`. Status faktur (`unpaid`, `partial`, `paid`) dan saldo utang dihitung dari total faktur dikurangi catatan pembayaran yang append-only.
+
+Pembayaran pemasok dicatat sebagai arus kas/bank eksternal; endpoint ini **tidak mengubah `kantin.saldo`, `kantin_transaksi`, atau saldo santri**. Untuk item penjualan yang HPP-nya tersedia, biaya pokok diambil dari snapshot saat penjualan, sehingga perubahan rata-rata harga berikutnya tidak mengubah nilai historis.
 
 ### Kantin yang ditugaskan
 
@@ -516,12 +582,11 @@ Response `201`:
 }
 ```
 
-`PATCH /api/kantin/:id/produk/:productId` menerima field parsial. Contoh mengubah harga dan stok:
+`PATCH /api/kantin/:id/produk/:productId` menerima field parsial untuk data produk, harga, stok minimum, dan status. Stok tidak dapat diubah melalui endpoint ini agar semua perubahan stok tercatat. Contoh mengubah harga:
 
 ```json
 {
-  "harga": 4500,
-  "stok": 35
+  "harga": 4500
 }
 ```
 
@@ -555,7 +620,33 @@ Response `200`:
 }
 ```
 
-Perubahan jumlah stok direkam dalam riwayat pergerakan stok. `stok` dan `stok_minimum` bilangan bulat non-negatif; harga harus positif. Batas panjang: nama 120 karakter, kategori 80, SKU 40, barcode 80.
+`stok_minimum` bilangan bulat non-negatif; harga harus positif. Batas panjang: nama 120 karakter, kategori 80, SKU 40, barcode 80. Untuk stok awal produk, endpoint pembuatan mencatat pergerakan stok awal.
+
+### Penerimaan dan penyesuaian stok
+
+`POST /api/kantin/:id/produk/:productId/stok` menerima perubahan stok dengan alasan yang wajib dicatat.
+
+Penerimaan barang:
+
+```json
+{
+  "movement_type": "receipt",
+  "quantity_change": 20,
+  "note": "Penerimaan faktur INV-104"
+}
+```
+
+Penyesuaian stok (selisih boleh positif atau negatif):
+
+```json
+{
+  "movement_type": "adjustment",
+  "quantity_change": -2,
+  "note": "Dua barang rusak saat pemeriksaan"
+}
+```
+
+Alasan harus sepanjang 5-255 karakter. Stok tidak boleh turun di bawah nol atau melampaui batas `INT UNSIGNED`. Perubahan stok dan catatan pergerakannya disimpan dalam satu transaksi database.
 
 ### Pergerakan stok
 
@@ -596,7 +687,7 @@ Response `200`:
 }
 ```
 
-`movement_type`: `adjustment` untuk perubahan manual atau stok awal produk, `sale` untuk pengurangan akibat penjualan. `quantity_change` negatif berarti stok berkurang.
+`movement_type`: `adjustment` untuk perubahan manual atau stok awal produk, `receipt` untuk barang masuk, `sale` untuk pengurangan checkout, dan `refund` untuk restok barang refund. `quantity_change` negatif berarti stok berkurang.
 
 ### Verifikasi santri sebelum transaksi
 
@@ -733,11 +824,31 @@ Response `201` sama dengan penjualan manual:
 
 `Idempotency-Key` harus unik untuk transaksi baru. Jika request berhasil tetapi respons tidak diterima, ulangi payload yang sama dengan key yang sama. Respons retry identik `200` dan `data.duplicate` bernilai `true`; key sama untuk payload lain menghasilkan `409`.
 
+### Giliran kasir dan keranjang tertahan
+
+Kasir wajib membuka giliran aktif sebelum melakukan penjualan atau refund. Status giliran dan rekap sementara:
+
+- `GET /api/kantin/:id/giliran/aktif` mengembalikan `data: null` jika belum ada giliran aktif, atau giliran beserta `sales_total`, `refunds_total`, `net_total`, dan jumlah transaksi.
+- `POST /api/kantin/:id/giliran/buka` menerima `{ "opening_note": "Mulai shift pagi" }`; catatan opsional.
+- `POST /api/kantin/:id/giliran/:shiftId/tutup` menerima `{ "closing_note": "Kasir selesai" }`; respons berisi rekap final.
+- `GET /api/kantin/:id/giliran/riwayat` mengembalikan riwayat 20 giliran terakhir.
+
+`GET /api/kantin/:id/keranjang-tertahan` menampilkan keranjang milik akun kasir tersebut. Keranjang dapat dibuat dengan `POST` atau diperbarui dengan `PUT` ke endpoint yang sama:
+
+```json
+{
+  "label": "Pesanan asrama A",
+  "items": [{ "product_id": 23, "quantity": 2 }]
+}
+```
+
+Simpan dan pulihkan keranjang hanya pada kantin tempat produk aktif. Maksimal 50 keranjang per akun kasir dan kantin; keranjang hanya dibagikan lintas perangkat oleh akun kasir yang sama, bukan antar-kasir. `DELETE /api/kantin/:id/keranjang-tertahan/:cartId` menghapusnya. Stok dan harga selalu divalidasi ulang oleh server ketika checkout.
+
 ### Riwayat kasir
 
 `GET /api/kantin/:id/transaksi?page=1&limit=20&tipe_transaksi=penjualan`
 
-Filter `tipe_transaksi` opsional: `penjualan` atau `pencairan`.
+Filter `tipe_transaksi` opsional: `penjualan`, `refund`, atau `pencairan`.
 
 Response `200`:
 
@@ -794,7 +905,30 @@ Response `200`:
 }
 ```
 
-Untuk transaksi pencairan, `santri_id`, `nis`, dan `nama_lengkap` bernilai `null`; `items` tidak ditambahkan jika tidak ada transaksi penjualan terkait.
+Untuk transaksi pencairan, `santri_id`, `nis`, dan `nama_lengkap` bernilai `null`; `items` tidak ditambahkan jika tidak ada transaksi penjualan terkait. Riwayat refund mengacu pada item transaksi penjualan asal dan menyertakan alasan refund serta status restok.
+
+### Refund penuh
+
+Hanya kasir pencatat transaksi penjualan yang boleh memproses refund, dan kasir harus mempunyai giliran aktif. Refund bersifat penuh dan hanya dapat dilakukan sekali untuk satu penjualan. Tidak ada approval admin kedua; alasan tetap wajib dicatat.
+
+`POST /api/kantin/:id/transaksi/:transactionId/refund` memerlukan header `Idempotency-Key` dan body:
+
+```json
+{
+  "reason": "Barang dikembalikan utuh",
+  "restock": true
+}
+```
+
+Alasan harus 5-500 karakter. `restock` wajib boolean dan hanya mengembalikan kuantitas ke stok jika barang benar-benar diterima kembali. Refund mengkredit saldo santri dan mengurangi saldo kantin secara atomik; refund ditolak dengan `409` bila saldo kantin tidak cukup atau saldo santri tidak dapat menampung pengembalian. Retry harus memakai key dan body yang sama; refund kedua dengan key berbeda ditolak.
+
+### Laporan penjualan kantin (admin)
+
+`GET /api/admin/kantin/:id/laporan?from=2026-10-01&to=2026-10-31&page=1&limit=20` menerima tanggal ISO kalender yang valid, inklusif, dengan rentang maksimal 366 hari. Filter opsional: `cashier_id` dan `product_id`. Respons JSON menyertakan `data`, `summary` (total dan jumlah penjualan/refund, nilai bersih, serta `margin`), dan `pagination`. Ringkasan `margin` memuat penjualan item yang HPP-nya diketahui, refund item terukur, HPP bersih setelah retur stok, laba kotor, persentase margin, jumlah transaksi terukur, dan transaksi tanpa HPP yang dapat dihitung. Transaksi nominal manual dan penjualan lama tanpa snapshot HPP tidak disajikan sebagai margin terukur. Untuk ekspor seluruh transaksi pada rentang yang sama, tambahkan `format=csv`; ekspor dibatasi 20.000 baris dan menetralkan teks formula spreadsheet.
+
+`GET /api/admin/kantin/:id/giliran?limit=20` mengembalikan rekap per giliran (batas maksimal 100). Admin dapat memakai `GET /api/admin/kantin/:id/produk` untuk mengisi filter produk. Laporan admin tidak mengembalikan rincian item per transaksi; filter produk hanya membatasi transaksi yang relevan.
+
+Jika filter produk digunakan, transaksi penjualan/refund dicantumkan apabila item transaksi asal memuat produk tersebut; nominal laporan tetap merupakan nilai transaksi penuh, bukan subtotal produk.
 
 ### Persetujuan pengajuan pencairan oleh kasir
 

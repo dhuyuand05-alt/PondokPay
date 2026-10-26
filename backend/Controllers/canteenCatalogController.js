@@ -157,6 +157,9 @@ export const updateCanteenProduct = async (req, res) => {
   if (!canteenId || !productId) return res.status(400).json({ message: 'ID kantin atau produk tidak valid.' });
   const parsed = parseProduct(req.body, true);
   if (parsed.errors) return res.status(400).json({ message: parsed.errors[0], errors: parsed.errors });
+  if (parsed.values.stok !== undefined) {
+    return res.status(400).json({ message: 'Ubah stok melalui fitur penerimaan atau penyesuaian stok agar tercatat di riwayat.' });
+  }
   const fields = Object.keys(parsed.values);
   if (!fields.length) return res.status(400).json({ message: 'Tidak ada data produk yang diubah.' });
   const connection = await pool.getConnection();
@@ -175,15 +178,6 @@ export const updateCanteenProduct = async (req, res) => {
       `UPDATE canteen_products SET ${assignments} WHERE id = ? AND kantin_id = ?`,
       [...fields.map((field) => parsed.values[field]), productId, canteenId]
     );
-    if (parsed.values.stok !== undefined && parsed.values.stok !== Number(product.stok)) {
-      const change = parsed.values.stok - Number(product.stok);
-      await connection.query(
-        `INSERT INTO canteen_stock_movements
-           (product_id, user_id, movement_type, quantity_change, stock_after, note)
-         VALUES (?, ?, 'adjustment', ?, ?, 'Penyesuaian stok produk oleh petugas kantin')`,
-        [productId, req.user.id, change, parsed.values.stok]
-      );
-    }
     await connection.commit();
     const [[updated]] = await pool.query('SELECT * FROM canteen_products WHERE id = ?', [productId]);
     return res.status(200).json({ message: 'Produk berhasil diperbarui.', data: updated });
@@ -192,6 +186,70 @@ export const updateCanteenProduct = async (req, res) => {
     if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'SKU atau barcode sudah digunakan di kantin ini.' });
     console.error('Update canteen product error:', error);
     return res.status(500).json({ message: 'Gagal memperbarui produk.' });
+  } finally {
+    connection.release();
+  }
+};
+
+export const changeCanteenProductStock = async (req, res) => {
+  const canteenId = parseId(req.params.id);
+  const productId = parseId(req.params.productId);
+  const delta = req.body?.quantity_change;
+  const movementType = req.body?.movement_type;
+  const note = req.body?.note;
+  if (!canteenId || !productId) {
+    return res.status(400).json({ message: 'ID kantin atau produk tidak valid.' });
+  }
+  if (typeof delta !== 'number' && typeof delta !== 'string' ||
+      !/^-?\d+$/.test(String(delta)) || !Number.isSafeInteger(Number(delta)) ||
+      Number(delta) === 0 || Math.abs(Number(delta)) > 1000000) {
+    return res.status(400).json({ message: 'Perubahan stok harus bilangan bulat selain nol, maksimal 1.000.000.' });
+  }
+  if (!['receipt', 'adjustment'].includes(movementType) ||
+      (movementType === 'receipt' && Number(delta) < 1)) {
+    return res.status(400).json({ message: 'Jenis pergerakan stok tidak valid.' });
+  }
+  if (typeof note !== 'string' || note.trim().length < 5 || note.trim().length > 255) {
+    return res.status(400).json({ message: 'Alasan perubahan stok wajib diisi (5-255 karakter).' });
+  }
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[product]] = await connection.query(
+      `SELECT id, stok FROM canteen_products
+       WHERE id = ? AND kantin_id = ? FOR UPDATE`,
+      [productId, canteenId]
+    );
+    if (!product) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'Produk tidak ditemukan.' });
+    }
+    const stockAfter = Number(product.stok) + Number(delta);
+    if (stockAfter < 0 || stockAfter > 4294967295) {
+      await connection.rollback();
+      return res.status(409).json({ message: 'Perubahan akan membuat stok di luar batas yang diizinkan.' });
+    }
+    await connection.query(
+      `UPDATE canteen_products
+       SET stok = ?, average_unit_cost = CASE WHEN ? > 0 THEN NULL ELSE average_unit_cost END
+       WHERE id = ?`,
+      [stockAfter, Number(delta), productId]
+    );
+    await connection.query(
+      `INSERT INTO canteen_stock_movements
+         (product_id, user_id, movement_type, quantity_change, stock_after, note)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [productId, req.user.id, movementType, Number(delta), stockAfter, note.trim()]
+    );
+    await connection.commit();
+    return res.status(200).json({
+      message: movementType === 'receipt' ? 'Stok masuk berhasil dicatat.' : 'Penyesuaian stok berhasil dicatat.',
+      data: { product_id: productId, stock_after: stockAfter },
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Change canteen product stock error:', error);
+    return res.status(500).json({ message: 'Gagal mencatat perubahan stok.' });
   } finally {
     connection.release();
   }

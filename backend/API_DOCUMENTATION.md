@@ -399,6 +399,9 @@ Dokumentasi khusus API kantin yang dilengkapi contoh request/response JSON dan a
 | POST | `/api/admin/kantin/:id/pencairan/persetujuan-kasir` | Minta konfirmasi kasir: `{ "jumlah": 10000, "keterangan": "..." }` |
 | POST | `/api/admin/kantin/:id/pencairan` | Cairkan saldo kantin |
 | GET | `/api/admin/kantin/:id/transaksi` | Riwayat penjualan/pencairan |
+| GET | `/api/admin/kantin/:id/laporan` | Laporan penjualan dan refund; `from`, `to`, optional `cashier_id`, `product_id`; `format=csv` untuk ekspor |
+| GET | `/api/admin/kantin/:id/giliran` | Rekap giliran kasir |
+| GET | `/api/admin/kantin/:id/produk` | Daftar produk untuk filter laporan |
 
 Objek kantin pada API admin: `id`, `nama`, `lokasi`, `status` (`active`/`inactive`), `saldo`, `created_at`. Pengelolaan katalog dan stok tidak tersedia untuk admin. Admin tetap dapat mencatat penjualan nominal manual; ringkasan transaksi admin tidak menyertakan rincian produk.
 
@@ -538,7 +541,7 @@ Lookup harus mengirim tepat satu dari `rfid_uid`, `fingerprint_id`, atau `nis`. 
 
 Katalog produk dan stok sepenuhnya dikelola kasir yang ditugaskan. Produk memakai `nama`, `kategori` (default `Umum`), `harga` (> 0), `stok`, `stok_minimum`, `sku`, `barcode`, dan `is_active`. SKU/barcode opsional tetapi harus unik di dalam kantin. Produk dinonaktifkan melalui `PATCH` dengan `{ "is_active": false }`; penyesuaian stok dicatat sebagai pergerakan stok. Kasir dapat memakai pencatatan nominal atau POS produk pada setiap transaksi saat katalog aktif. Scanner USB/Bluetooth yang bertindak sebagai keyboard dapat digunakan pada kolom pencarian: pindai SKU/barcode lalu tekan Enter. Stok dikurangi hanya jika checkout berhasil.
 
-Penjualan memakai body dan output dasar yang sama dengan penjualan admin. Untuk POS, kirim `items` beserta `jumlah`; total akan dihitung kembali dari harga produk saat ini. Jika harga berubah atau stok tidak cukup, transaksi ditolak dengan `409` tanpa debit saldo atau perubahan stok. Header `Idempotency-Key` wajib; gunakan key unik untuk transaksi baru dan key/body yang sama hanya untuk retry transaksi yang hasilnya belum diterima. Riwayat kasir dapat menyertakan rincian produk, sedangkan riwayat dan laporan admin hanya menampilkan jumlah serta total transaksi. Respons riwayat memakai `data` dan `pagination` sebagaimana bagian transaksi admin; filter opsional `tipe_transaksi=penjualan|pencairan`.
+Penjualan kasir memerlukan giliran aktif. Penjualan memakai body dan output dasar yang sama dengan penjualan admin. Untuk POS, kirim `items` beserta `jumlah`; total akan dihitung kembali dari harga produk saat ini. Jika harga berubah atau stok tidak cukup, transaksi ditolak dengan `409` tanpa debit saldo atau perubahan stok. Header `Idempotency-Key` wajib; gunakan key unik untuk transaksi baru dan key/body yang sama hanya untuk retry transaksi yang hasilnya belum diterima. Kasir dapat menahan keranjang pada server dan memulihkannya di perangkat lain dengan akun kasir yang sama. Riwayat kasir dapat menyertakan rincian produk, sedangkan riwayat dan laporan admin hanya menampilkan jumlah serta total transaksi. Refund penuh kasir memerlukan alasan dan giliran aktif; hanya kasir pencatat transaksi asal yang boleh memproses refund. Saldo santri dan kantin diperbarui atomik, dan restok dicatat bila barang dikonfirmasi kembali. Respons riwayat memakai `data` dan `pagination`; filter opsional `tipe_transaksi=penjualan|refund|pencairan`.
 
 ## API orang tua/wali
 

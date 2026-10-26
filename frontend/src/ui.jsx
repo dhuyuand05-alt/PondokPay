@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, Bell, Blocks, BookOpenText,
   ChevronLeft, ChevronRight, CircleUserRound, ClipboardList, Coffee, CreditCard, Download,
-  Fingerprint, LayoutDashboard, LogOut, Menu, MessageCircle, Package, Search, Settings2, ShieldCheck, SlidersHorizontal, Users, Wallet, X,
+  Fingerprint, LayoutDashboard, LogOut, Menu, MessageCircle, Package, FilePlus2, Search, Settings2, ShieldCheck, SlidersHorizontal, Users, Wallet, X,
 } from 'lucide-react';
 import { api, resolveAssetUrl } from './api.js';
 
@@ -295,45 +295,149 @@ const managementLinks = [
 export function AdminLayout({ user, onLogout }) {
   const institution = useInstitution();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const pageName = [...adminLinks, ...managementLinks].find((link) =>
     link.end ? location.pathname === link.to : location.pathname.startsWith(link.to),
   )?.label || 'Admin';
 
-  const menu = (
-    <div className="flex h-full flex-col bg-pondok-700 text-white">
-      <div className="px-5 pb-5 pt-6"><Brand inverse /><div className="mt-7"><p className="text-sm font-semibold">{institution.name}</p><p className="mt-1 text-xs text-white/60">Ruang administrasi</p></div></div>
-      <nav className="flex-1 px-3">
-        <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-white/55">Utama</p>
+  const renderMenu = (compact = false, mobile = false) => (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-pondok-700 text-white">
+      <div className={cx('shrink-0 px-5 pb-5 pt-6', compact && 'px-3')}>
+        <div className={cx('flex items-center justify-between gap-3', compact && 'justify-center')}>
+          {compact ? (
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10" title={institution.name || 'PondokPay'}>
+              {institution.logo_path
+                ? <img src={resolveAssetUrl(institution.logo_path)} alt="" className="h-full w-full rounded-xl object-contain" />
+                : <Blocks size={21} />}
+            </span>
+          ) : <Brand inverse />}
+          {mobile && (
+            <button
+              type="button"
+              className="rounded-lg p-2 text-white/75 transition hover:bg-white/10 hover:text-white"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Tutup menu navigasi"
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
+        {!compact && (
+          <div className="mt-7">
+            <p className="text-sm font-semibold">{institution.name}</p>
+            <p className="mt-1 text-xs text-white/60">Ruang administrasi</p>
+          </div>
+        )}
+      </div>
+      <nav
+        className={cx('admin-nav-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3', compact && 'px-2')}
+        aria-label="Navigasi admin"
+      >
+        <p className={cx('px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-white/55', compact && 'sr-only')}>Utama</p>
+        {compact && <div aria-hidden="true" className="mx-3 mb-2 border-t border-white/15" />}
         {adminLinks.map(({ to, label, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({ isActive }) => cx('mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition', isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/5')}>
-            <Icon size={18} />{label}
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={() => setMobileOpen(false)}
+            title={compact ? label : undefined}
+            aria-label={label}
+            className={({ isActive }) => cx('mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm transition', compact && 'justify-center px-0', isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/5')}
+          >
+            <Icon size={18} className="shrink-0" /><span className={compact ? 'sr-only' : 'min-w-0 truncate'}>{label}</span>
           </NavLink>
         ))}
-        <p className="px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-white/55">Pengelolaan</p>
+        <p className={cx('px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-white/55', compact && 'sr-only')}>Pengelolaan</p>
+        {compact && <div aria-hidden="true" className="mx-3 mb-2 mt-3 border-t border-white/15" />}
         {managementLinks.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => cx('mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition', isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/5')}>
-            <Icon size={18} />{label}
+          <NavLink
+            key={to}
+            to={to}
+            onClick={() => setMobileOpen(false)}
+            title={compact ? label : undefined}
+            aria-label={label}
+            className={({ isActive }) => cx('mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm transition', compact && 'justify-center px-0', isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/5')}
+          >
+            <Icon size={18} className="shrink-0" /><span className={compact ? 'sr-only' : 'min-w-0 truncate'}>{label}</span>
           </NavLink>
         ))}
       </nav>
-      <div className="m-4 rounded-xl bg-white/5 p-4 text-xs leading-relaxed text-white/70"><ShieldCheck size={18} className="mb-2 text-pondok-200" />Akses admin dilindungi verifikasi dua langkah.</div>
-      <div className="flex items-center gap-3 border-t border-white/10 p-4">
+      {!compact && (
+        <div className="m-4 shrink-0 rounded-xl bg-white/5 p-4 text-xs leading-relaxed text-white/70">
+          <ShieldCheck size={18} className="mb-2 text-pondok-200" />Akses admin dilindungi verifikasi dua langkah.
+        </div>
+      )}
+      <div className={cx('flex shrink-0 items-center gap-3 border-t border-white/10 p-4', compact && 'flex-col gap-2 px-2')}>
         <Avatar name={user.username} className="bg-white/15 text-white" />
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{user.username}</p><p className="text-xs text-white/60">Administrator</p></div>
-        <button onClick={onLogout} className="rounded-lg p-2 text-white/70 hover:bg-white/10" title="Keluar"><LogOut size={18} /></button>
+        {!compact && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">{user.username}</p>
+            <p className="text-xs text-white/60">Administrator</p>
+          </div>
+        )}
+        <button
+          onClick={onLogout}
+          className="rounded-lg p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+          title="Keluar"
+          aria-label="Keluar"
+        >
+          <LogOut size={18} />
+        </button>
       </div>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-canvas lg:flex">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[236px] lg:block">{menu}</aside>
-      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)}><aside className="h-full w-[280px]" onClick={(event) => event.stopPropagation()}>{menu}</aside></div>}
-      <div className="min-w-0 flex-1 lg:ml-[236px]">
+      <aside
+        id="admin-sidebar"
+        aria-label="Navigasi admin desktop"
+        className={cx('fixed inset-y-0 left-0 z-30 hidden transition-[width] duration-300 ease-in-out lg:block', sidebarCollapsed ? 'w-[76px]' : 'w-[236px]')}
+      >
+        {renderMenu(sidebarCollapsed)}
+      </aside>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)}>
+          <aside
+            id="admin-mobile-sidebar"
+            aria-label="Navigasi admin"
+            className="h-full w-[min(86vw,320px)] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {renderMenu(false, true)}
+          </aside>
+        </div>
+      )}
+      <div className={cx('min-w-0 flex-1 transition-[margin] duration-300 ease-in-out', sidebarCollapsed ? 'lg:ml-[76px]' : 'lg:ml-[236px]')}>
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-line bg-white/95 px-4 backdrop-blur sm:px-7">
-          <div className="flex items-center gap-3"><button className="rounded-lg p-2 hover:bg-canvas lg:hidden" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><span className="text-sm text-muted">Admin</span><ChevronRight size={15} className="text-muted" /><span className="text-sm font-semibold">{pageName}</span></div>
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              className="shrink-0 rounded-lg p-2 text-muted transition hover:bg-canvas hover:text-pondok-700 lg:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Buka menu navigasi"
+              aria-expanded={mobileOpen}
+              aria-controls="admin-mobile-sidebar"
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              type="button"
+              className="hidden shrink-0 rounded-lg p-2 text-muted transition hover:bg-canvas hover:text-pondok-700 lg:inline-flex"
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+              aria-label={sidebarCollapsed ? 'Buka lebar menu navigasi' : 'Ciutkan menu navigasi'}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="admin-sidebar"
+            >
+              {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            </button>
+            <span className="shrink-0 text-sm text-muted">Admin</span>
+            <ChevronRight size={15} className="shrink-0 text-muted" />
+            <span className="truncate text-sm font-semibold">{pageName}</span>
+          </div>
           <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted"><PwaInstallButton /><span className="hidden sm:inline">{new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: institution.timezone || 'Asia/Jakarta' }).format(new Date())}</span><span className="badge-green">Sesi aman</span></div>
         </header>
         <main className="mx-auto max-w-[1480px] p-4 sm:p-7"><Outlet /></main>
@@ -431,6 +535,7 @@ function CashierFrame({ user, basePath, children, onLogout, token }) {
   const navigation = [
     { to: '', label: 'Kasir', icon: Coffee, desktopLabel: 'Kasir' },
     { to: 'catalog', label: 'Produk', icon: Package, desktopLabel: 'Produk & stok' },
+    { to: 'purchasing', label: 'Belanja', icon: FilePlus2, desktopLabel: 'Pembelian & pemasok' },
     { to: 'history', label: 'Riwayat', icon: ClipboardList, desktopLabel: 'Riwayat transaksi' },
     { to: 'payout-approvals', label: 'Lainnya', icon: Blocks, desktopLabel: 'Persetujuan pencairan' },
   ];
@@ -438,17 +543,17 @@ function CashierFrame({ user, basePath, children, onLogout, token }) {
     to ? location.pathname.startsWith(`${basePath}/${to}`) : location.pathname === basePath || location.pathname === `${basePath}/`,
   )?.desktopLabel || 'Akun';
   const navButtonClass = (active) => cx(
-    'flex items-center gap-3 rounded-xl text-sm transition',
-    active ? 'bg-[#e9f4ef] font-semibold text-[#078264]' : 'text-[#718079] hover:bg-[#f5f7f4]',
+    'flex items-center gap-3 rounded-xl text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pondok-200',
+    active ? 'bg-pondok-50 font-semibold text-pondok-700' : 'text-[#718079] hover:bg-[#f5f7f4]',
   );
 
   return (
-    <div className="mx-auto min-h-screen bg-[#f5f6f2] text-[#20352e] lg:flex">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[216px] flex-col border-r border-[#e0e5dd] bg-white lg:flex">
-        <div className="border-b border-[#e9ece7] px-5 py-6">
+    <div className="mx-auto min-h-screen bg-[#f5f7f4] text-ink lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[236px] flex-col overflow-y-auto border-r border-[#e0e5dd] bg-white lg:flex">
+        <div className="sticky top-0 z-10 border-b border-[#e9ece7] bg-white px-5 py-5">
           <Brand />
         </div>
-        <div className="mx-4 mt-4 rounded-2xl bg-[#f5f5f1] p-3">
+        <div className="mx-4 mt-4 rounded-2xl border border-line/70 bg-[#f7f8f5] p-3.5">
           <p className="truncate text-sm font-semibold">{selectedCanteen?.nama || 'Kantin'}</p>
           <p className="mt-1 truncate text-[11px] text-muted">{selectedCanteen?.lokasi || 'Kantin yang ditugaskan'}</p>
           <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#e5f4ec] px-2 py-1 text-[10px] font-semibold text-[#078264]">
@@ -456,7 +561,7 @@ function CashierFrame({ user, basePath, children, onLogout, token }) {
             {selectedCanteen?.status === 'active' ? 'Aktif' : 'Memuat'}
           </span>
         </div>
-        <nav className="mt-5 flex-1 px-4">
+        <nav className="mt-5 flex-1 px-4 pb-4">
           <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-[#9aa69f]">Ruang kerja</p>
           {navigation.map(({ to, icon: Icon, desktopLabel }) => {
             const active = to
@@ -487,12 +592,12 @@ function CashierFrame({ user, basePath, children, onLogout, token }) {
         <button
           type="button"
           onClick={() => navigate(`${basePath}/account`)}
-          className="mx-4 mb-3 flex items-center gap-2 rounded-lg bg-[#e9f4ef] px-3 py-2 text-left text-[11px] text-[#176b50]"
+          className="mx-4 mb-3 flex min-h-10 items-center gap-2 rounded-lg bg-pondok-50 px-3 py-2 text-left text-[11px] font-medium text-pondok-700 transition hover:bg-pondok-100"
         >
           <ShieldCheck size={15} />
           Akun dilindungi MFA
         </button>
-        <div className="flex items-center gap-3 border-t border-[#e9ece7] px-4 py-3">
+        <div className="sticky bottom-0 flex items-center gap-3 border-t border-[#e9ece7] bg-white px-4 py-3">
           <Avatar name={user.username} className="h-8 w-8 bg-[#f2f3ef] text-xs" />
           <button
             type="button"
@@ -507,8 +612,8 @@ function CashierFrame({ user, basePath, children, onLogout, token }) {
           </button>
         </div>
       </aside>
-      <div className="min-w-0 flex-1 lg:ml-[216px]">
-        <header className="sticky top-0 z-20 flex min-h-[60px] items-center justify-between border-b border-[#e0e5dd] bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+      <div className="min-w-0 flex-1 lg:ml-[236px]">
+        <header className="sticky top-0 z-20 flex min-h-[64px] items-center justify-between border-b border-[#e0e5dd] bg-white/95 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <div className="lg:hidden">
               <Brand />
@@ -530,18 +635,18 @@ function CashierFrame({ user, basePath, children, onLogout, token }) {
               type="button"
               onClick={() => navigate(`${basePath}/account`)}
               aria-label="Buka pengaturan akun"
-              className="inline-flex items-center gap-1 text-[#078264]"
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 font-semibold text-pondok-700 transition hover:bg-pondok-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pondok-200"
             >
               <ShieldCheck size={14} /> MFA aktif
             </button>
           </div>
         </header>
-        <main className="mx-auto min-h-[calc(100vh-60px)] max-w-[1500px] px-4 pb-24 pt-4 sm:px-6 lg:px-7 lg:pb-8 lg:pt-7">
+        <main className="mx-auto min-h-[calc(100vh-64px)] max-w-[1380px] px-4 pb-24 pt-4 sm:px-6 lg:px-8 lg:pb-8 lg:pt-7">
           {frameError && <Alert type="error" className="mb-4">{frameError}</Alert>}
           {children}
         </main>
       </div>
-      <nav className="fixed bottom-0 left-1/2 z-30 grid w-full max-w-[520px] -translate-x-1/2 grid-cols-4 border-t border-[#e0e5dd] bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1 shadow-[0_-8px_24px_rgba(24,63,54,0.06)] backdrop-blur-xl lg:hidden">
+      <nav className="fixed bottom-0 left-1/2 z-30 grid w-full max-w-[520px] -translate-x-1/2 grid-cols-5 border-t border-[#e0e5dd] bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1 shadow-[0_-8px_24px_rgba(24,63,54,0.06)] backdrop-blur-xl lg:hidden">
         {navigation.map(({ to, label, icon: Icon }) => {
           const active = to
             ? location.pathname.startsWith(`${basePath}/${to}`)
@@ -550,7 +655,7 @@ function CashierFrame({ user, basePath, children, onLogout, token }) {
             <button
               key={to}
               onClick={() => navigate(to ? `${basePath}/${to}` : basePath)}
-              className={cx('relative flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px]', active ? 'font-semibold text-[#078264]' : 'text-muted')}
+              className={cx('relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pondok-200', active ? 'font-semibold text-pondok-700' : 'text-muted')}
             >
               <Icon size={18} strokeWidth={active ? 2.4 : 1.8} />
               <span>{label}</span>

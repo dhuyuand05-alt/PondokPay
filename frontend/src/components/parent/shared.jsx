@@ -7,7 +7,7 @@ export function selectedChildId(children) {
 
 export function typeName(type) {
   return (
-    { belanja: 'Belanja santri', topup: 'Top up saldo', tarik: 'Penarikan saldo' }[type] ||
+    { belanja: 'Belanja santri', refund_belanja: 'Pengembalian belanja', topup: 'Top up saldo', tarik: 'Penarikan saldo' }[type] ||
     'Transaksi'
   );
 }

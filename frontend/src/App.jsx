@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import {
   ArrowDownLeft,
@@ -45,6 +45,8 @@ import DocumentationPage from './DocumentationPage.jsx';
 
 const TOKEN_KEY = 'pondokpay.access_token';
 const USER_KEY = 'pondokpay.user';
+const CashierPurchasing = lazy(() => import('./components/cashier/Purchasing.jsx')
+  .then((module) => ({ default: module.CashierPurchasing })));
 
 function Login({ onLogin, institutionError }) {
   const [username, setUsername] = useState('');
@@ -425,6 +427,7 @@ function SessionRoutes({ session, onLogout, onInstitutionUpdate }) {
         <Route path="/kasir" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierHome token={token} /></MobileLayout>} />
         <Route path="/kasir/history" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierHistory token={token} /></MobileLayout>} />
         <Route path="/kasir/catalog" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierCatalogManagement token={token} /></MobileLayout>} />
+        <Route path="/kasir/purchasing" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><Suspense fallback={<Loading />}><CashierPurchasing token={token} /></Suspense></MobileLayout>} />
         <Route path="/kasir/payout-approvals" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierPayoutApprovals token={token} /></MobileLayout>} />
         <Route path="/kasir/account" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierAccount token={token} user={user} onLogout={onLogout} /></MobileLayout>} />
         <Route path="*" element={<Navigate to="/kasir" replace />} />

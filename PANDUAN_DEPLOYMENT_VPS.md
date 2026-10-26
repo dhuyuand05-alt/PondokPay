@@ -209,7 +209,7 @@ mysql < sql/install.sql
 mysql db_cashless_santri -e "SHOW TABLES;"
 ```
 
-Tabel utama yang dibuat adalah `users`, `institution_settings`, `parent_notification_settings`, `whatsapp_notification_outbox`, `santri`, `kantin`, `credentials_auth`, `transaksi`, `midtrans_topup_payments`, `kantin_transaksi`, `kantin_kasir`, `canteen_payout_approvals`, `wali_santri`, `audit_logs`, `financial_approvals`, dan `security_rate_limits`. `institution_settings` diisi dengan nilai contoh; ganti profil, nama aplikasi PWA, dan unggah logo dari menu Pengaturan pondok setelah admin dibuat. Backend menambahkan kolom `app_name` melalui migrasi skema.
+Tabel utama yang dibuat adalah `users`, `institution_settings`, `parent_notification_settings`, `whatsapp_notification_outbox`, `santri`, `kantin`, `credentials_auth`, `transaksi`, `midtrans_topup_payments`, `kantin_transaksi`, `kantin_kasir`, `canteen_payout_approvals`, `canteen_products`, `canteen_sale_items`, `canteen_stock_movements`, `canteen_shifts`, `canteen_held_carts`, `canteen_sale_refunds`, `wali_santri`, `audit_logs`, `financial_approvals`, dan `security_rate_limits`. `institution_settings` diisi dengan nilai contoh; ganti profil, nama aplikasi PWA, dan unggah logo dari menu Pengaturan pondok setelah admin dibuat. Migrator aplikasi menyesuaikan schema instalasi lama, termasuk tabel POS kantin dan tipe transaksi refund.
 
 Untuk notifikasi WhatsApp Baileys, admin memindai QR dari halaman Pengaturan pondok. Sediakan direktori sesi persisten privat untuk akun layanan backend; QR hanya tersedia bagi admin yang sudah login. Gunakan nomor khusus bot karena Baileys memakai protokol WhatsApp Web tidak resmi dan koneksi/nomor dapat dibatasi. Uji pairing, pengiriman notifikasi opt-in, restart backend, dan pemulihan staging sebelum digunakan.
 
@@ -326,7 +326,7 @@ Pastikan password pada `BACKUP_DB_PASSWORD` cocok dengan user backup di database
 
 ## 9. Jalankan migrasi dan tes koneksi backend
 
-Skema SQL sudah dibuat pada langkah sebelumnya. Jalankan migrator untuk memastikan skema sesuai versi aplikasi. Perintah berikut memuat kredensial dari file environment ke proses shell sementara:
+Skema SQL sudah dibuat pada langkah sebelumnya. Buat dan verifikasi backup database sebelum menjalankan migrator; migrasi dapat menambah/mengubah enum dan membuat tabel POS kantin untuk shift, keranjang tertahan, refund, serta audit stok. Jalankan migrator sebelum deploy kode yang memakai endpoint tersebut. Perintah berikut memuat kredensial dari file environment ke proses shell sementara:
 
 ```bash
 cd /var/www/pondokpay/backend
