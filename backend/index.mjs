@@ -21,6 +21,7 @@ import {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 const uploadDirectory = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
   : path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'uploads');
@@ -109,8 +110,8 @@ const startServer = async () => {
     await pool.query('SELECT 1');
     await resumeWhatsAppSession();
     startWhatsAppNotificationWorker();
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server is running on port ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`Server is running on ${HOST}:${PORT}`);
       console.log('Admin APIs are ready.');
     });
   } catch (error) {

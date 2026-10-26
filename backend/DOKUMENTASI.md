@@ -61,6 +61,7 @@ Gunakan `backend/.env.example` sebagai daftar variabel yang tersedia. Simpan nil
 | Variabel | Kegunaan |
 |---|---|
 | `PORT` | Port HTTP API; default `3000` |
+| `HOST` | Alamat bind API; default `0.0.0.0`. Pada produksi dengan reverse proxy satu host, gunakan `127.0.0.1` agar port API tidak terbuka langsung ke jaringan |
 | `NODE_ENV` | Mode aplikasi; gunakan `production` saat deployment produksi |
 | `JWT_SECRET` | Kunci token; wajib sekurangnya 32 byte acak |
 | `MFA_ENCRYPTION_KEY` | Kunci AES-256 untuk secret MFA; 64 karakter hex |

@@ -29,7 +29,7 @@ This API handles real balances. Do not expose it to the public internet until th
 
 ## Production configuration and database permissions
 
-Set `NODE_ENV=production`, strong independent keys, `DB_AUTO_MIGRATE=false`, `DB_SSL_CA` to the trusted database CA certificate, and `TRUST_PROXY_HOPS` to the exact number of trusted TLS-terminating proxies. The API rejects plain HTTP in production. Configure the reverse proxy to redirect HTTP to HTTPS, forward `X-Forwarded-Proto`, and enforce its own distributed rate limit. The in-process general API limiter is per instance; login/MFA limits are database-backed and shared across instances.
+Set `NODE_ENV=production`, `HOST=127.0.0.1` when the reverse proxy is on the same host, strong independent keys, `DB_AUTO_MIGRATE=false`, `DB_SSL_CA` to the trusted database CA certificate, and `TRUST_PROXY_HOPS` to the exact number of trusted TLS-terminating proxies. The API rejects plain HTTP in production. Configure the reverse proxy to redirect HTTP to HTTPS, forward `X-Forwarded-Proto`, and enforce its own distributed rate limit. The in-process general API limiter is per instance; login/MFA limits are database-backed and shared across instances.
 
 Run `npm run migrate` with a separate `MIGRATION_DB_USER` account before deploying the application. Keep the runtime database account limited to required DML; it must not have schema/trigger privileges. The runtime account must not be able to delete users, students, canteens, credentials, financial ledger rows, audit logs, or approval records. Grant application reads/writes broadly only if the application uses a dedicated database containing no unrelated tables; grant deletes only for relation unlinking and rate-limit cleanup:
 
