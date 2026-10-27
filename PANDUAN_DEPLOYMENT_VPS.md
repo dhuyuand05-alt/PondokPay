@@ -567,7 +567,7 @@ Sebelum pembaruan, baca perubahan skema dan backup database. Jangan jalankan mig
 | SSH `Permission denied (publickey)` untuk root | Gunakan username SSH yang ditampilkan di hPanel atau Console VPS; periksa SSH key yang terpasang dan jalankan `sudo -i` setelah berhasil masuk |
 | Clone GitHub gagal | Pastikan VPS memiliki DNS/internet keluar; periksa apakah `/var/www/pondokpay` sudah berisi file dari percobaan sebelumnya sebelum mengulang clone |
 | `adduser` mengatakan user sudah ada | Periksa `getent passwd pondokpay`; gunakan akun yang sudah ada hanya jika dipastikan milik deployment ini |
-| `mysql < sql/install.sql` gagal pada `SOURCE` | Jalankan lagi dari `/var/www/pondokpay/backend`, pastikan `sql/users.sql` dan `sql/admin_api.sql` tersedia, lalu baca pesan error lengkap dari MySQL |
+| `mysql < sql/install.sql` gagal | Jalankan dari `/var/www/pondokpay/backend`, pastikan MySQL aktif dan user memiliki izin membuat database serta tabel, lalu baca pesan error lengkap dari MySQL |
 | `npm ci` gagal | Periksa `node --version` (minimal 20), ruang disk, DNS, dan permission direktori `/var/www/pondokpay` |
 | Nginx `permission denied` membaca `index.html` | Jalankan `namei -l /var/www/pondokpay/frontend/dist/index.html` dan pastikan setiap direktori dapat dilalui serta berkas dapat dibaca oleh `www-data` |
 | Certbot gagal validasi | Pastikan DNS A mengarah ke VPS, port 80 dibuka di firewall/security group, dan server block Nginx benar |

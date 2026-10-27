@@ -1,5 +1,11 @@
 import pool from '../../config/db.js';
-import { parseId, parsePagination, validCredentialStatuses } from './shared.js';
+import {
+  duplicateError,
+  parseId,
+  parsePagination,
+  runInTransaction,
+  validCredentialStatuses,
+} from './shared.js';
 
 export const getCredentials = async (req, res) => {
   try {

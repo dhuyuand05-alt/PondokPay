@@ -26,7 +26,7 @@ Nilai saldo menggunakan `DECIMAL` dan umumnya dikirim sebagai string desimal, mi
 
 Dependency utama adalah Express, `mysql2`, `jsonwebtoken`, `bcryptjs`, `dotenv`, `multer` untuk unggahan logo, Baileys dan `qrcode` untuk koneksi WhatsApp berbasis QR, serta PDFKit untuk laporan finansial. Midtrans Snap menggunakan HTTPS API bawaan Node.js tanpa menyimpan Server Key di frontend. Versi dependency terkunci di `package-lock.json`.
 
-Untuk instalasi database kosong, gunakan [`sql/install.sql`](./sql/install.sql) dari direktori `backend`; skrip tersebut memasang semua tabel dan trigger yang dipakai aplikasi melalui `users.sql` dan `admin_api.sql`. Langkah deployment VPS lengkap terdapat di [PANDUAN_DEPLOYMENT_VPS.md](../PANDUAN_DEPLOYMENT_VPS.md).
+Untuk instalasi database kosong, gunakan [`sql/install.sql`](./sql/install.sql) dari direktori `backend`. Skrip ini mandiri dan mencakup seluruh tabel, indeks, foreign key, serta trigger yang dipakai aplikasi; tidak memerlukan file SQL lain melalui `SOURCE`. Langkah deployment VPS lengkap terdapat di [PANDUAN_DEPLOYMENT_VPS.md](../PANDUAN_DEPLOYMENT_VPS.md).
 
 ## 3. Instalasi dan menjalankan secara lokal
 
