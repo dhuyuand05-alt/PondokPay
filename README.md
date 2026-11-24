@@ -17,3 +17,18 @@ Aplikasi pengelolaan saldo santri dan transaksi kantin, terdiri dari backend RES
 - `frontend/` — aplikasi web React/Vite.
 
 Lihat dokumentasi per bagian untuk persyaratan, konfigurasi, perintah instalasi, dan pengujian.
+
+## Menjalankan secara lokal
+
+Pastikan konfigurasi database backend sudah tersedia, lalu jalankan API dan frontend di terminal terpisah:
+
+```powershell
+npm start
+```
+
+```powershell
+npm run dev:frontend
+```
+
+Frontend tersedia di `http://localhost:5173` dan API di `http://localhost:3000`.
+Jalankan tes backend dengan `npm test` dan production build frontend dengan `npm run build`.

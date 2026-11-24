@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -42,6 +42,7 @@ import {
 import { CashierAccount, CashierCatalogManagement, CashierHome, CashierHistory, CashierPayoutApprovals } from './components/cashier/index.js';
 import { ParentAccount, ParentHome, ParentHistory, ParentLimit, ParentTopup } from './components/parent/index.js';
 import DocumentationPage from './DocumentationPage.jsx';
+import PortfolioApp from './Portfolio.jsx';
 
 const TOKEN_KEY = 'pondokpay.access_token';
 const USER_KEY = 'pondokpay.user';
@@ -447,6 +448,7 @@ function SessionRoutes({ session, onLogout, onInstitutionUpdate }) {
 }
 
 export default function App() {
+  const location = useLocation();
   const [institution, setInstitution] = useState({
     name: 'Nama Pondok',
     app_name: null,
@@ -489,14 +491,16 @@ export default function App() {
 
   useEffect(() => {
     setInstitutionTimeZone(institution.timezone);
-    document.title = institution.app_name || (institution.name ? `${institution.name} · PondokPay` : 'PondokPay');
+    if (!location.pathname.startsWith('/portfolio')) {
+      document.title = institution.app_name || (institution.name ? `${institution.name} · PondokPay` : 'PondokPay');
+    }
     const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
     if (appleIcon) appleIcon.href = resolveAssetUrl(institution.logo_path) || '/pwa-icon.svg';
     const favicon = document.querySelector('link[rel="icon"]');
     if (favicon) favicon.href = resolveAssetUrl(institution.logo_path) || '/pwa-icon.svg';
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) themeColor.content = '#075746';
-  }, [institution]);
+  }, [institution, location.pathname]);
 
   useEffect(() => {
     if (!session?.token) return undefined;
@@ -540,6 +544,9 @@ export default function App() {
     setInstitution(settings);
   };
 
+  if (location.pathname === '/portfolio' || location.pathname.startsWith('/portfolio/')) {
+    return <PortfolioApp admin={location.pathname === '/portfolio/admin'} />;
+  }
   if (checking) return <InstitutionContext.Provider value={institution}><Loading label="Memeriksa sesi..." /></InstitutionContext.Provider>;
   if (challenge) return <InstitutionContext.Provider value={institution}><Mfa challenge={challenge} onComplete={completeLogin} onBack={() => setChallenge(null)} /></InstitutionContext.Provider>;
   if (!session) {

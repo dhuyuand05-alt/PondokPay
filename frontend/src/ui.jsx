@@ -294,6 +294,7 @@ const managementLinks = [
 
 export function AdminLayout({ user, onLogout }) {
   const institution = useInstitution();
+  const [desktopOpen, setDesktopOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -302,38 +303,76 @@ export function AdminLayout({ user, onLogout }) {
   )?.label || 'Admin';
 
   const menu = (
-    <div className="flex h-full flex-col bg-pondok-700 text-white">
-      <div className="px-5 pb-5 pt-6"><Brand inverse /><div className="mt-7"><p className="text-sm font-semibold">{institution.name}</p><p className="mt-1 text-xs text-white/60">Ruang administrasi</p></div></div>
-      <nav className="flex-1 px-3">
-        <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-white/55">Utama</p>
+    <div className="flex h-dvh min-h-0 flex-col border-r border-white/10 bg-gradient-to-b from-pondok-700 to-pondok-800 text-white">
+      <div className="shrink-0 border-b border-white/10 px-4 pb-5 pt-5 sm:px-5 sm:pt-6">
+        <div className="flex min-h-10 items-center justify-between">
+          <Brand inverse />
+          <button
+            className="rounded-xl p-2 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pondok-200 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Tutup menu admin"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3">
+          <p className="truncate text-sm font-semibold">{institution.name}</p>
+          <p className="mt-1 text-[11px] font-medium tracking-wide text-white/55">RUANG ADMINISTRASI</p>
+        </div>
+      </div>
+      <nav id="admin-navigation" aria-label="Menu admin" className="admin-nav-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+        <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">Utama</p>
         {adminLinks.map(({ to, label, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({ isActive }) => cx('mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition', isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/5')}>
-            <Icon size={18} />{label}
+          <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({ isActive }) => cx('group mb-1 flex min-h-11 items-center gap-3 rounded-xl border-l-2 px-3 py-2.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pondok-200', isActive ? 'border-pondok-200 bg-white/10 font-semibold text-white' : 'border-transparent text-white/75 hover:bg-white/[0.07] hover:text-white')}>
+            <Icon size={17} strokeWidth={1.8} className="shrink-0 text-white/60 transition-colors group-hover:text-white" />{label}
           </NavLink>
         ))}
-        <p className="px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-white/55">Pengelolaan</p>
+        <p className="px-3 pb-2 pt-6 text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">Pengelolaan</p>
         {managementLinks.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => cx('mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition', isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/5')}>
-            <Icon size={18} />{label}
+          <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => cx('group mb-1 flex min-h-11 items-center gap-3 rounded-xl border-l-2 px-3 py-2.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pondok-200', isActive ? 'border-pondok-200 bg-white/10 font-semibold text-white' : 'border-transparent text-white/75 hover:bg-white/[0.07] hover:text-white')}>
+            <Icon size={17} strokeWidth={1.8} className="shrink-0 text-white/60 transition-colors group-hover:text-white" />{label}
           </NavLink>
         ))}
       </nav>
-      <div className="m-4 rounded-xl bg-white/5 p-4 text-xs leading-relaxed text-white/70"><ShieldCheck size={18} className="mb-2 text-pondok-200" />Akses admin dilindungi verifikasi dua langkah.</div>
-      <div className="flex items-center gap-3 border-t border-white/10 p-4">
-        <Avatar name={user.username} className="bg-white/15 text-white" />
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{user.username}</p><p className="text-xs text-white/60">Administrator</p></div>
-        <button onClick={onLogout} className="rounded-lg p-2 text-white/70 hover:bg-white/10" title="Keluar"><LogOut size={18} /></button>
+      <div className="mx-4 mb-3 flex shrink-0 items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-[11px] leading-relaxed text-white/65">
+        <ShieldCheck size={17} className="mt-0.5 shrink-0 text-pondok-200" />
+        <span>Akses admin dilindungi verifikasi dua langkah.</span>
+      </div>
+      <div className="flex shrink-0 items-center gap-3 border-t border-white/10 px-4 py-3.5">
+        <Avatar name={user.username} className="h-9 w-9 bg-white/10 text-xs text-white ring-1 ring-white/10" />
+        <div className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold">{user.username}</p><p className="mt-0.5 text-[11px] text-white/55">Administrator</p></div>
+        <button onClick={onLogout} className="rounded-xl p-2 text-white/65 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pondok-200" title="Keluar" aria-label="Keluar"><LogOut size={17} /></button>
       </div>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-canvas lg:flex">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[236px] lg:block">{menu}</aside>
-      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)}><aside className="h-full w-[280px]" onClick={(event) => event.stopPropagation()}>{menu}</aside></div>}
-      <div className="min-w-0 flex-1 lg:ml-[236px]">
+      {desktopOpen && <aside className="fixed inset-y-0 left-0 z-30 hidden w-[236px] lg:block">{menu}</aside>}
+      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] lg:hidden" onClick={() => setMobileOpen(false)}><aside className="h-full w-[280px] shadow-2xl" onClick={(event) => event.stopPropagation()}>{menu}</aside></div>}
+      <div className={cx('min-w-0 flex-1', desktopOpen && 'lg:ml-[236px]')}>
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-line bg-white/95 px-4 backdrop-blur sm:px-7">
-          <div className="flex items-center gap-3"><button className="rounded-lg p-2 hover:bg-canvas lg:hidden" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><span className="text-sm text-muted">Admin</span><ChevronRight size={15} className="text-muted" /><span className="text-sm font-semibold">{pageName}</span></div>
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-xl p-2 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pondok-200 lg:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Buka menu admin"
+              aria-expanded={mobileOpen}
+              aria-controls="admin-navigation"
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              className="hidden rounded-xl p-2 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pondok-200 lg:inline-flex"
+              onClick={() => setDesktopOpen((open) => !open)}
+              aria-label={desktopOpen ? 'Tutup menu admin' : 'Buka menu admin'}
+              aria-expanded={desktopOpen}
+              aria-controls="admin-navigation"
+            >
+              {desktopOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <span className="text-sm text-muted">Admin</span><ChevronRight size={15} className="text-muted" /><span className="text-sm font-semibold">{pageName}</span>
+          </div>
           <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted"><PwaInstallButton /><span className="hidden sm:inline">{new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: institution.timezone || 'Asia/Jakarta' }).format(new Date())}</span><span className="badge-green">Sesi aman</span></div>
         </header>
         <main className="mx-auto max-w-[1480px] p-4 sm:p-7"><Outlet /></main>

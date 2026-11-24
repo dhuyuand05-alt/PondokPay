@@ -1,0 +1,2093 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Presentasi Design Thinking PondokPay: pahami pengguna, rumuskan masalah, ciptakan solusi, dan uji bersama." />
+  <meta name="theme-color" content="#071b16" />
+  <title>Design Thinking · PondokPay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #071b16;
+      --ink: #f7f5ee;
+      --ink-soft: #d4e0da;
+      --muted: #8ea69c;
+      --accent: #c8f560;
+      --accent-2: #34d399;
+      --accent-ink: #071b16;
+      --surface: rgba(255, 255, 255, 0.05);
+      --surface-strong: rgba(255, 255, 255, 0.09);
+      --card: rgba(14, 39, 32, 0.78);
+      --border: rgba(255, 255, 255, 0.13);
+      --callout-bg: rgba(200, 245, 96, 0.09);
+      --callout-border: rgba(200, 245, 96, 0.32);
+      --callout-ink: #eef7d6;
+      --topbar-bg: rgba(7, 27, 22, 0.78);
+      --shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius: 20px;
+    }
+
+    body.theme-light {
+      --surface: rgba(15, 76, 58, 0.045);
+      --surface-strong: rgba(15, 76, 58, 0.085);
+      --card: rgba(255, 255, 255, 0.88);
+      --border: rgba(15, 76, 58, 0.14);
+      --callout-bg: #f8f0dc;
+      --callout-border: #e4cfa0;
+      --callout-ink: #5a4822;
+      --topbar-bg: rgba(248, 244, 236, 0.84);
+      --shadow: 0 20px 54px rgba(18, 48, 38, 0.09);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.65s cubic-bezier(0.22, 1, 0.36, 1), color 0.55s ease;
+    }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    ::selection { background: var(--accent); color: var(--accent-ink); }
+
+    /* Ambient Studio Backdrop */
+    .ambient {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .aura {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(115px);
+      opacity: 0.32;
+      transition: all 0.95s ease;
+    }
+    .aura-1 { width: 48vw; height: 48vw; top: -16%; right: -8%; background: radial-gradient(circle, var(--accent), transparent 70%); }
+    .aura-2 { width: 44vw; height: 44vw; bottom: -18%; left: -10%; background: radial-gradient(circle, var(--accent-2), transparent 70%); }
+    .dot-matrix {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(currentColor 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.055;
+      mask-image: radial-gradient(ellipse 85% 80% at 50% 50%, #000 40%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 50%, #000 40%, transparent 100%);
+    }
+
+    /* Topbar Glass Chrome */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 68px;
+      z-index: 50;
+      padding: 0 clamp(16px, 4.5vw, 64px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: var(--topbar-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: background 0.55s ease, border-color 0.55s ease;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      cursor: pointer;
+    }
+    .brand-mark {
+      width: 35px; height: 35px;
+      border-radius: 11px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+      transition: transform 0.25s ease, background 0.5s ease, color 0.5s ease;
+    }
+    .brand:hover .brand-mark { transform: rotate(-6deg) scale(1.06); }
+    .brand-title { font-weight: 800; font-size: 14px; letter-spacing: -0.02em; }
+    .brand-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding-left: 10px;
+      border-left: 1px solid var(--border);
+    }
+
+    .top-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .phase-badge {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .phase-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chrome-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 11px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .chrome-btn:hover, .chrome-btn.active {
+      border-color: var(--accent);
+      background: var(--surface-strong);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+    .kbd-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .ws-timer-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 11px;
+      border-radius: 11px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .ws-mini-btn {
+      border: none;
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Main Slide Stage */
+    .stage {
+      position: relative;
+      z-index: 10;
+      width: 100vw;
+      height: 100vh;
+    }
+    .slide {
+      position: absolute;
+      inset: 68px 0 68px 0;
+      padding: clamp(18px, 3vh, 42px) clamp(18px, 5.5vw, 84px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(18px) scale(0.99);
+      transition: opacity 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                  visibility 0.48s;
+    }
+    .slide.is-active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+    .wrap { width: min(1260px, 100%); margin: auto; }
+    .wrap.wide { width: min(1360px, 100%); }
+
+    .slide.is-active .stagger {
+      animation: riseIn 0.56s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: calc(var(--d, 0) * 55ms);
+    }
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Typography */
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 22px; height: 1.5px;
+      background: currentColor;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(44px, 5.6vw, 76px);
+      font-weight: 400;
+      line-height: 0.99;
+      letter-spacing: -0.025em;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-family: var(--font-serif);
+      font-size: clamp(34px, 4.3vw, 56px);
+      font-weight: 400;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+    .accent-italic {
+      font-style: italic;
+      color: var(--accent);
+    }
+    h3 { font-size: 15.5px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 6px; }
+    .lede {
+      max-width: 680px;
+      font-size: clamp(14.5px, 1.45vw, 17px);
+      line-height: 1.65;
+      color: var(--ink-soft);
+      margin-bottom: 20px;
+    }
+    .small { font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .tiny-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Cards & Callouts */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 19px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: transform 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+    }
+    .callout {
+      margin-top: 16px;
+      padding: 13px 16px;
+      border-radius: 14px;
+      background: var(--callout-bg);
+      border: 1px solid var(--callout-border);
+      color: var(--callout-ink);
+      font-size: 12.5px;
+      line-height: 1.55;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .grid { display: grid; gap: 13px; }
+    .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .g-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .g-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+    .pill-btn {
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .pill-btn:hover, .pill-btn.active {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+    .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.06); }
+
+    /* SLIDE 1: Cover + Interactive 3D Phone */
+    .cover-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: clamp(24px, 5vw, 72px);
+      align-items: center;
+    }
+    .meta-pills { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; }
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+    .phone-stage {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 455px;
+      perspective: 1100px;
+    }
+    .orbit-ring {
+      position: absolute;
+      width: min(35vw, 430px);
+      aspect-ratio: 1;
+      border: 1px dashed rgba(200, 245, 96, 0.28);
+      border-radius: 50%;
+      animation: spinSlow 36s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes spinSlow { to { transform: rotate(360deg); } }
+
+    .phone-device {
+      position: relative;
+      z-index: 2;
+      width: 282px;
+      padding: 11px;
+      border-radius: 34px;
+      background: #ffffff;
+      border: 1px solid #d5dfd9;
+      box-shadow: 0 34px 80px rgba(0, 0, 0, 0.45);
+      color: #173a32;
+      transform-style: preserve-3d;
+      transition: transform 0.15s ease-out;
+    }
+    .phone-inner {
+      background: #f7f9f5;
+      border-radius: 25px;
+      padding: 16px 15px;
+      min-height: 416px;
+    }
+    .phone-notch {
+      width: 58px; height: 5px;
+      border-radius: 99px;
+      background: #173a32;
+      margin: -4px auto 14px;
+    }
+    .wallet-hero {
+      padding: 15px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #155a47, #0b4035);
+      color: #ffffff;
+      margin-top: 12px;
+    }
+    .wallet-hero small { font-size: 10px; color: rgba(255,255,255,0.75); }
+    .wallet-hero strong { display: block; font-size: 23px; margin: 5px 0 10px; letter-spacing: -0.04em; }
+    .wallet-bar { height: 5px; border-radius: 9px; background: rgba(255,255,255,0.2); overflow: hidden; margin-bottom: 7px; }
+    .wallet-bar i { display: block; height: 100%; background: #c8f560; transition: width 0.35s ease, background 0.35s ease; }
+    .wallet-foot { display: flex; justify-content: space-between; font-size: 9.5px; color: rgba(255,255,255,0.82); }
+    .phone-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+    .phone-act-btn {
+      padding: 9px 8px;
+      border-radius: 12px;
+      border: 1px solid #dce5de;
+      background: #ffffff;
+      color: #155a47;
+      font-size: 10.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .phone-act-btn:hover { background: #155a47; color: #ffffff; border-color: #155a47; }
+    .tx-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid #e5ebe6;
+      font-size: 10px;
+    }
+    .tx-item span { display: block; color: #6e8077; font-size: 9px; margin-top: 2px; }
+    .float-sticky {
+      position: absolute;
+      right: 4px;
+      bottom: 22px;
+      z-index: 3;
+      width: 176px;
+      padding: 13px 14px;
+      border-radius: 16px;
+      background: #fffefa;
+      color: #173a32;
+      border: 1px solid #dfe5da;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+      transform: rotate(-3deg);
+    }
+    .float-sticky strong { display: block; font-size: 11.5px; margin-bottom: 4px; }
+    .float-sticky p { font-size: 10px; color: #65776e; line-height: 1.45; }
+
+    /* Interactive Inspector Panels */
+    .inspector-box {
+      margin-top: 14px;
+      padding: 15px 18px;
+      border-radius: 16px;
+      background: var(--card);
+      border: 1px solid var(--accent);
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    /* SLIDE 2 & 3 Interactive Cards */
+    .click-card { cursor: pointer; text-align: left; }
+    .click-card.selected {
+      border-color: var(--accent);
+      background: var(--surface-strong);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .num-serif {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      color: var(--accent);
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    /* SLIDE 5: Interactive Empathy Map */
+    .empathy-quads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; margin-top: 14px; }
+    .eq-box {
+      padding: 15px 17px;
+      border-radius: 17px;
+      border: 1px solid var(--border);
+      min-height: 132px;
+    }
+    .eq-box:nth-child(1) { background: #eef4e9; }
+    .eq-box:nth-child(2) { background: #f5eee4; }
+    .eq-box:nth-child(3) { background: #eeedf4; }
+    .eq-box:nth-child(4) { background: #f5eae2; }
+    .eq-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .eq-head strong { font-size: 12.5px; letter-spacing: 0.05em; }
+    .eq-head span { font-size: 10.5px; color: var(--muted); }
+    .eq-quote { font-family: var(--font-serif); font-style: italic; font-size: 16.5px; color: #243b33; line-height: 1.38; margin-bottom: 8px; }
+    .eq-notes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .eq-chip {
+      font-size: 11px;
+      padding: 4px 9px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.85);
+      border: 1px solid rgba(15, 76, 58, 0.14);
+      color: #173a32;
+    }
+    .empathy-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .add-note-form { display: flex; gap: 6px; flex-wrap: wrap; }
+    .studio-input {
+      padding: 7px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 12px;
+      outline: none;
+    }
+    .studio-input:focus { border-color: var(--accent); }
+
+    /* SLIDE 6: Problem Statement Builder */
+    .ps-builder {
+      margin-top: 14px;
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: var(--card);
+      border: 1px solid var(--accent);
+    }
+    .ps-sentence {
+      font-family: var(--font-serif);
+      font-size: clamp(20px, 2.3vw, 28px);
+      line-height: 1.45;
+      color: var(--ink);
+      margin-top: 10px;
+    }
+    .ps-inline-input {
+      background: var(--surface-strong);
+      border: none;
+      border-bottom: 2px solid var(--accent);
+      border-radius: 6px 6px 0 0;
+      padding: 2px 8px;
+      color: var(--accent);
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: inherit;
+      width: auto;
+      min-width: 190px;
+      outline: none;
+    }
+
+    /* SLIDE 7: Dark HMW Banner */
+    .hmw-banner {
+      padding: clamp(22px, 3.5vw, 40px);
+      border-radius: 24px;
+      background: #0b362c;
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.14);
+      position: relative;
+      overflow: hidden;
+    }
+    .hmw-banner h2 { color: #ffffff; font-size: clamp(28px, 3.8vw, 48px); margin: 10px 0 12px; }
+    .hmw-check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+    }
+    .hmw-check.checked { border-color: var(--accent); }
+    .chk-box {
+      width: 22px; height: 22px;
+      border-radius: 7px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    /* SLIDE 8 & 9: SCAMPER & Sticky Note Idea Bank */
+    .scamper-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+    .scamper-btn {
+      padding: 13px 8px;
+      border-radius: 15px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .scamper-btn:hover, .scamper-btn.active {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+      background: var(--surface-strong);
+    }
+    .scamper-letter {
+      width: 30px; height: 30px;
+      border-radius: 9px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 8px;
+    }
+    .sticky-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+    .sticky-note {
+      padding: 13px 14px;
+      border-radius: 14px;
+      background: #f5eece;
+      color: #1c352d;
+      border: 1px solid rgba(28, 53, 45, 0.12);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 92px;
+      transition: transform 0.2s ease;
+    }
+    .sticky-note:nth-child(3n+2) { background: #e5efe0; }
+    .sticky-note:nth-child(3n) { background: #ece7f2; }
+    .sticky-note:nth-child(4n) { background: #f3e4db; }
+    .sticky-note:hover { transform: translateY(-3px) scale(1.01); }
+    .vote-btn {
+      align-self: flex-end;
+      margin-top: 6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(28, 53, 45, 0.2);
+      background: rgba(255,255,255,0.75);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .vote-btn.voted { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
+
+    /* SLIDE 10: Impact x Ease Matrix */
+    .matrix-split { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 22px; align-items: center; margin-top: 14px; }
+    .matrix-board {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 9px;
+      min-height: 315px;
+      padding: 22px 18px 30px 36px;
+      border-radius: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+    .quad-box {
+      padding: 13px;
+      border-radius: 14px;
+      background: #e9f2ea;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .quad-box:nth-child(3), .quad-box:nth-child(4) { background: #f2efe6; }
+    .m-chip {
+      display: inline-block;
+      padding: 6px 11px;
+      margin: 4px 4px 0 0;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 1px solid rgba(15, 76, 58, 0.2);
+      color: #173a32;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .m-chip:hover, .m-chip.selected {
+      background: #0f4c3a;
+      color: #ffffff;
+      border-color: #0f4c3a;
+      transform: scale(1.04);
+    }
+
+    /* SLIDE 12: Live Interactive Prototype Phone */
+    .proto-split { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 32px; align-items: center; }
+    .live-phone {
+      width: min(100%, 385px);
+      margin: 0 auto;
+      padding: 12px;
+      border-radius: 30px;
+      background: #ffffff;
+      border: 1px solid #d2ddd6;
+      box-shadow: 0 28px 65px rgba(15, 55, 42, 0.16);
+      color: #173a32;
+    }
+    .live-screen {
+      background: #f6f9f6;
+      border-radius: 21px;
+      padding: 18px;
+    }
+    .sim-drawer {
+      margin-top: 10px;
+      padding: 11px 12px;
+      border-radius: 13px;
+      background: #ffffff;
+      border: 1px solid #dbe5dd;
+      font-size: 11px;
+    }
+
+    /* SLIDE 14: Editable Feedback Capture Grid */
+    .capture-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+    .capture-col {
+      padding: 13px;
+      border-radius: 15px;
+      background: var(--card);
+      border: 1px dashed var(--accent);
+    }
+    .capture-col textarea {
+      width: 100%;
+      min-height: 62px;
+      margin-top: 7px;
+      padding: 8px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 11.5px;
+      resize: vertical;
+      outline: none;
+    }
+    .capture-col textarea:focus { border-color: var(--accent); }
+
+    /* Bottom Scrubber Dock */
+    .bottombar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 68px;
+      z-index: 50;
+      padding: 0 clamp(16px, 4.5vw, 64px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border);
+      background: var(--topbar-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: background 0.55s ease, border-color 0.55s ease;
+    }
+    .counter-box {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--muted);
+      min-width: 90px;
+    }
+    .counter-box strong { color: var(--ink); font-size: 15px; }
+    .scrubber {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      max-width: 560px;
+      margin: 0 18px;
+    }
+    .scrub-seg {
+      flex: 1;
+      height: 6px;
+      border-radius: 99px;
+      border: none;
+      background: var(--surface-strong);
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .scrub-seg:hover { transform: scaleY(1.6); background: var(--ink-soft); }
+    .scrub-seg.passed { background: var(--accent); opacity: 0.45; }
+    .scrub-seg.current { background: var(--accent); opacity: 1; flex: 2.2; box-shadow: 0 0 10px var(--accent); }
+
+    .nav-btns { display: flex; gap: 8px; }
+    .nav-btn {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .nav-btn:hover:not(:disabled) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Overview Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(5, 16, 13, 0.86);
+      backdrop-filter: blur(22px);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+    }
+    .modal-overlay.open { opacity: 1; visibility: visible; }
+    .overview-box {
+      width: min(1100px, 100%);
+      max-height: 85vh;
+      overflow-y: auto;
+      background: #0a221c;
+      color: #f7f5ee;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px;
+      padding: clamp(20px, 3.5vw, 34px);
+    }
+    .ov-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+    .ov-card {
+      padding: 13px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.11);
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .ov-card:hover, .ov-card.active { border-color: #c8f560; background: rgba(200, 245, 96, 0.14); transform: translateY(-2px); }
+    .ov-card span { display: block; font-family: var(--font-mono); font-size: 10px; color: #c8f560; margin-bottom: 4px; }
+    .ov-card strong { display: block; font-size: 12.5px; }
+
+    @media (max-width: 960px) {
+      .cover-grid, .proto-split, .matrix-split, .inspector-box { grid-template-columns: 1fr; }
+      .g-3, .g-4, .g-5, .sticky-grid, .capture-grid, .ov-grid { grid-template-columns: repeat(2, 1fr); }
+      .scamper-grid { grid-template-columns: repeat(4, 1fr); }
+      .top-center, .brand-sub { display: none; }
+    }
+    @media (max-width: 640px) {
+      .g-2, .g-3, .g-4, .g-5, .empathy-quads, .sticky-grid, .capture-grid, .scamper-grid { grid-template-columns: 1fr; }
+      .scrubber, .kbd-tag { display: none; }
+    }
+    @media print {
+      html, body { overflow: visible; height: auto; background: #fff !important; color: #111 !important; }
+      .ambient, .topbar, .bottombar, .modal-overlay { display: none !important; }
+      .slide { position: relative; inset: auto; opacity: 1 !important; visibility: visible !important; transform: none !important; page-break-after: always; min-height: 100vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <div class="dot-matrix"></div>
+    <div class="aura aura-1"></div>
+    <div class="aura aura-2"></div>
+  </div>
+
+  <!-- Top Glass Header -->
+  <header class="topbar">
+    <div class="brand" id="brand-home" title="Kembali ke Sampul">
+      <div class="brand-mark">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 10.5 12 4l8 6.5V20H4z" />
+          <path d="M9 20v-6h6v6" />
+        </svg>
+      </div>
+      <span class="brand-title">PondokPay</span>
+      <span class="brand-sub">Design Thinking Studio</span>
+    </div>
+
+    <div class="top-center">
+      <span class="phase-badge" id="phase-badge"><span class="phase-dot"></span><span id="phase-text">INTRO · 2026</span></span>
+    </div>
+
+    <div class="top-actions">
+      <div class="ws-timer-pill" title="Timer Workshop (45 menit)">
+        <span id="ws-clock">45:00</span>
+        <button type="button" class="ws-mini-btn" id="ws-start">▶</button>
+        <button type="button" class="ws-mini-btn" id="ws-reset" style="background:var(--surface-strong);color:var(--ink);">↺</button>
+      </div>
+      <button type="button" class="chrome-btn" id="open-overview" title="Peta Slide (O / Ctrl+K)">
+        <span>▦ Peta</span>
+        <span class="kbd-tag">O</span>
+      </button>
+      <button type="button" class="chrome-btn" id="btn-print" title="Cetak / Simpan PDF">🖨 PDF</button>
+      <button type="button" class="chrome-btn" id="btn-full" title="Layar Penuh">⛶</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+
+    <!-- SLIDE 01: COVER -->
+    <section class="slide is-active" data-phase="INTRO · 2026" data-title="Sampul: Mulai dari Manusia" data-mode="dark" data-bg="#071b16" data-ink="#f7f5ee" data-soft="#d4e0da" data-muted="#8ea69c" data-accent="#c8f560" data-accent2="#34d399" data-aink="#071b16">
+      <div class="wrap">
+        <div class="cover-grid">
+          <div>
+            <p class="eyebrow stagger" style="--d:0">Rancangan proses · 2026</p>
+            <h1 class="stagger" style="--d:1">Mulai dari <span class="accent-italic">manusia.</span><br>Tumbuh bersama pondok.</h1>
+            <p class="lede stagger" style="--d:2">Design Thinking untuk menyempurnakan pengalaman santri, wali, kasir, dan pengelola PondokPay—dengan empati, eksperimen, dan pembelajaran nyata.</p>
+            <div class="meta-pills stagger" style="--d:3">
+              <span class="meta-pill">● Human-centered</span>
+              <span class="meta-pill">5 tahap · 1 proses iteratif</span>
+              <span class="meta-pill">Workshop 45–60 menit</span>
+            </div>
+            <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;" class="stagger" style="--d:4">
+              <button type="button" class="btn-primary" onclick="goSlide(1)">Mulai Eksplorasi →</button>
+              <button type="button" class="pill-btn" onclick="goSlide(11)">📱 Coba Prototype Ponsel</button>
+            </div>
+          </div>
+
+          <div class="phone-stage stagger" style="--d:2">
+            <div class="orbit-ring"></div>
+            <div class="phone-device" id="cover-phone">
+              <div class="phone-inner">
+                <div class="phone-notch"></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                  <span>Assalamu’alaikum,<br><b>Bu Aisyah</b></span>
+                  <span style="width:28px;height:28px;border-radius:9px;background:#e1efe4;color:#155a47;display:grid;place-items:center;font-weight:800;font-size:10px;">AA</span>
+                </div>
+                <div class="wallet-hero">
+                  <small>Saldo tersedia</small>
+                  <strong id="cov-bal">Rp 245.000</strong>
+                  <div class="wallet-bar"><i id="cov-bar" style="width:36%;"></i></div>
+                  <div class="wallet-foot"><span>Belanja hari ini</span><span id="cov-lim">Rp 18.000 / 50.000</span></div>
+                </div>
+                <div class="phone-btns">
+                  <button type="button" class="phone-act-btn" id="cov-topup">+ Top-up 50rb</button>
+                  <button type="button" class="phone-act-btn" id="cov-limit">⌁ Ubah Limit</button>
+                </div>
+                <div class="tiny-label" style="margin-bottom:4px;">Transaksi terbaru</div>
+                <div id="cov-tx-list">
+                  <div class="tx-item"><div><b>Warung Sehat</b><span>Hari ini · 10.24</span></div><strong>− Rp 12.000</strong></div>
+                  <div class="tx-item"><div><b>Top-up saldo</b><span>Kemarin · 16.02</span></div><strong style="color:#155a47;">+ Rp 100.000</strong></div>
+                </div>
+              </div>
+            </div>
+            <div class="float-sticky">
+              <strong>Ruang untuk empati</strong>
+              <p>Pengalaman lebih tenang dimulai dengan memahami kebutuhan setiap peran.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 02: 5 PRINSIP CARA BERPIKIR -->
+    <section class="slide" data-phase="01 · CARA BERPIKIR" data-title="Lima Prinsip Design Thinking" data-mode="light" data-bg="#f7f6f0" data-ink="#173a32" data-soft="#3e5950" data-muted="#687a72" data-accent="#18745a" data-accent2="#d7b76c" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">01 · Cara berpikir</p>
+        <h2 class="stagger" style="--d:1">Bukan hanya membangun fitur.<br><span class="accent-italic">Bangun pengalaman yang berarti.</span></h2>
+        <p class="lede stagger" style="--d:2">Design Thinking adalah pendekatan pemecahan masalah yang berpusat pada manusia: pahami konteks, rumuskan tantangan, ciptakan kemungkinan, lalu uji dan perbaiki.</p>
+
+        <div class="grid g-5 stagger" style="--d:3">
+          <button type="button" class="card click-card selected" data-pidx="0"><span class="num-serif">01</span><h3>Human-centered</h3><p class="small">Mulai dari tujuan, kebutuhan, hambatan, dan pengalaman nyata pengguna.</p></button>
+          <button type="button" class="card click-card" data-pidx="1"><span class="num-serif">02</span><h3>Empathy</h3><p class="small">Dengarkan dan amati sebelum menyimpulkan apa yang orang perlukan.</p></button>
+          <button type="button" class="card click-card" data-pidx="2"><span class="num-serif">03</span><h3>Kolaborasi</h3><p class="small">Satukan perspektif wali, kasir, pengelola, dan santri yang terdampak.</p></button>
+          <button type="button" class="card click-card" data-pidx="3"><span class="num-serif">04</span><h3>Eksperimen</h3><p class="small">Coba solusi kecil untuk memperoleh pembelajaran lebih awal.</p></button>
+          <button type="button" class="card click-card" data-pidx="4"><span class="num-serif">05</span><h3>Iterasi</h3><p class="small">Gunakan masukan untuk memperbaiki solusi, bukan sekadar memberi nilai.</p></button>
+        </div>
+
+        <div class="inspector-box stagger" style="--d:4">
+          <div>
+            <span class="tiny-label" style="color:var(--accent);">Penerapan di PondokPay (Klik kartu prinsip di atas)</span>
+            <h3 id="pr-title" style="margin-top:4px;">01 · Human-centered di PondokPay</h3>
+            <p class="small" id="pr-desc">Merancang layar wali agar sisa saldo dan batas jajan harian terbaca dalam 3 detik tanpa istilah akuntansi yang rumit.</p>
+          </div>
+          <div style="padding:11px 14px;border-radius:12px;background:var(--surface);font-size:12px;">
+            <strong style="color:var(--accent);">Pergeseran Pola Pikir:</strong>
+            <p class="small" id="pr-shift" style="margin-top:4px;">Dari "fitur apa lagi yang bisa kita koding?" → menjadi "apa yang membuat wali tenang dan kasir cepat?"</p>
+          </div>
+        </div>
+
+        <div class="callout stagger" style="--d:5">
+          <span>🛡️</span>
+          <span><strong>Prinsip kerja:</strong> jangan berasumsi sebagai fakta. Tandai hipotesis, lalu validasi bersama pengguna.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 03: PETA PROSES 5 TAHAP -->
+    <section class="slide" data-phase="02 · PETA PROSES" data-title="Lima Tahap Iteratif" data-mode="light" data-bg="#f7f6f0" data-ink="#173a32" data-soft="#3e5950" data-muted="#687a72" data-accent="#18745a" data-accent2="#d7b76c" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">02 · Peta proses</p>
+        <h2 class="stagger" style="--d:1">Lima tahap.<br><span class="accent-italic">Bukan lima langkah sekali jalan.</span></h2>
+        <p class="lede stagger" style="--d:2">Proses bergerak bolak-balik. Hasil uji mungkin mengubah prototipe, ide, bahkan cara kita mendefinisikan masalah.</p>
+
+        <div class="grid g-5 stagger" style="--d:3">
+          <button type="button" class="card click-card selected" data-stidx="0">
+            <span class="num-serif" style="font-size:20px;">01</span>
+            <h3>EMPATHIZE</h3>
+            <p class="small">Pahami manusia</p>
+          </button>
+          <button type="button" class="card click-card" data-stidx="1">
+            <span class="num-serif" style="font-size:20px;">02</span>
+            <h3>DEFINE</h3>
+            <p class="small">Tentukan masalah</p>
+          </button>
+          <button type="button" class="card click-card" data-stidx="2">
+            <span class="num-serif" style="font-size:20px;">03</span>
+            <h3>IDEATE</h3>
+            <p class="small">Perbanyak opsi</p>
+          </button>
+          <button type="button" class="card click-card" data-stidx="3">
+            <span class="num-serif" style="font-size:20px;">04</span>
+            <h3>PROTOTYPE</h3>
+            <p class="small">Buat untuk belajar</p>
+          </button>
+          <button type="button" class="card click-card" data-stidx="4">
+            <span class="num-serif" style="font-size:20px;">05</span>
+            <h3>TEST</h3>
+            <p class="small">Dengar feedback</p>
+          </button>
+        </div>
+
+        <div class="inspector-box stagger" style="--d:4">
+          <div>
+            <span class="tiny-label" style="color:var(--accent);">Detail Tahap Aktif</span>
+            <h3 id="st-title" style="margin-top:4px;">01 · EMPATHIZE — Pahami Manusia</h3>
+            <p class="small" id="st-desc">Mengamati antrean kantin saat istirahat dan mewawancarai wali santri tentang kekhawatiran uang saku.</p>
+          </div>
+          <div style="padding:11px 14px;border-radius:12px;background:var(--surface);font-size:12px;">
+            <strong style="color:var(--accent);">Output & Loop Kembali:</strong>
+            <p class="small" id="st-out" style="margin-top:4px;">Output: Empathy Map & kutipan pengguna. Jika saat Test ditemukan konteks baru, kembali ke sini.</p>
+          </div>
+        </div>
+
+        <div class="callout stagger" style="--d:5">
+          <span>🔄</span>
+          <span>Pahami → Rumuskan → Ciptakan → Uji → Perbaiki. Jika pengujian menunjukkan masalah yang berbeda, <strong>kembali ke tahap sebelumnya.</strong> Iterasi adalah bagian dari proses, bukan tanda gagal.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 04: EMPATHIZE - PERAN PENGGUNA -->
+    <section class="slide" data-phase="03 · EMPATHIZE" data-title="Peran Pengguna PondokPay" data-mode="light" data-bg="#f8f3eb" data-ink="#173a32" data-soft="#3e5950" data-muted="#6b7a72" data-accent="#0f4c3a" data-accent2="#c96a42" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">03 · Empathize</p>
+        <h2 class="stagger" style="--d:1">Siapa yang menjalani<br><span class="accent-italic">pengalaman PondokPay?</span></h2>
+        <p class="lede stagger" style="--d:2">Mulai dengan mengenali peran dan situasi. Daftar berikut adalah peta awal untuk memandu riset—bukan pengganti percakapan dengan pengguna.</p>
+
+        <div class="grid g-3 stagger" style="--d:3">
+          <button type="button" class="card click-card selected" data-roleidx="0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <span style="padding:6px 10px;border-radius:10px;background:#e4efe5;color:#0f4c3a;font-weight:800;font-size:12px;">WL</span>
+              <span class="tiny-label">Hipotesis konteks</span>
+            </div>
+            <h3>Orang tua / wali</h3>
+            <p class="small" style="margin-bottom:8px;">Pemantau dari luar pondok</p>
+            <ul style="padding-left:16px;font-size:12px;color:var(--ink-soft);line-height:1.55;">
+              <li>Ingin memahami saldo dan aktivitas anak.</li>
+              <li>Mengelola top-up dan batas belanja.</li>
+              <li>Mengakses informasi dari perangkat mobile.</li>
+            </ul>
+          </button>
+
+          <button type="button" class="card click-card" data-roleidx="1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <span style="padding:6px 10px;border-radius:10px;background:#f4e8d9;color:#8d5d39;font-weight:800;font-size:12px;">KS</span>
+              <span class="tiny-label">Hipotesis konteks</span>
+            </div>
+            <h3>Kasir kantin</h3>
+            <p class="small" style="margin-bottom:8px;">Melayani saat jam ramai</p>
+            <ul style="padding-left:16px;font-size:12px;color:var(--ink-soft);line-height:1.55;">
+              <li>Mencari akun santri dengan cepat.</li>
+              <li>Memastikan nominal dan saldo sebelum transaksi.</li>
+              <li>Menghindari salah input dan antrean panjang.</li>
+            </ul>
+          </button>
+
+          <button type="button" class="card click-card" data-roleidx="2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <span style="padding:6px 10px;border-radius:10px;background:#e8e4ef;color:#71608a;font-weight:800;font-size:12px;">AD</span>
+              <span class="tiny-label">Hipotesis konteks</span>
+            </div>
+            <h3>Admin pondok</h3>
+            <p class="small" style="margin-bottom:8px;">Menjaga operasional dan akuntabilitas</p>
+            <ul style="padding-left:16px;font-size:12px;color:var(--ink-soft);line-height:1.55;">
+              <li>Mengelola data, akun, kantin, dan persetujuan.</li>
+              <li>Meninjau transaksi dan laporan keuangan.</li>
+              <li>Menjaga hak akses dan jejak audit.</li>
+            </ul>
+          </button>
+        </div>
+
+        <div class="inspector-box stagger" style="--d:4">
+          <div>
+            <span class="tiny-label" style="color:var(--accent);">Panduan Wawancara Peran Terpilih</span>
+            <h3 id="rl-title" style="margin-top:4px;">Pertanyaan Riset untuk Orang Tua / Wali</h3>
+            <p class="small" id="rl-q">“Kapan terakhir kali Ibu/Bapak merasa ragu soal sisa uang saku anak di pondok, dan informasi apa yang paling menenangkan saat membuka aplikasi?”</p>
+          </div>
+          <div style="padding:11px 14px;border-radius:12px;background:var(--surface);font-size:12px;">
+            <strong style="color:var(--accent-2);">Konteks Lapangan:</strong>
+            <p class="small" id="rl-ctx" style="margin-top:4px;">Umumnya mengecek ponsel pada malam hari atau akhir pekan dengan koneksi seluler standar.</p>
+          </div>
+        </div>
+
+        <div class="callout stagger" style="--d:5">
+          <span>ℹ️</span>
+          <span><strong>Santri juga terdampak.</strong> Libatkan mereka untuk memahami konteks belanja, kebutuhan privasi, dan pengalaman saat menggunakan saldo—meskipun peran login utama berbeda.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 05: INTERACTIVE EMPATHY MAP -->
+    <section class="slide" data-phase="04 · EMPATHY MAP" data-title="Empathy Map Interaktif" data-mode="light" data-bg="#f8f3eb" data-ink="#173a32" data-soft="#3e5950" data-muted="#6b7a72" data-accent="#0f4c3a" data-accent2="#c96a42" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">04 · Mendengar & mengamati</p>
+        <h2 class="stagger" style="--d:1">Buat empathy map <span class="accent-italic">dari bukti, bukan tebakan.</span></h2>
+        <p class="lede stagger" style="--d:2" style="margin-bottom:10px;">Gunakan empat lensa untuk merangkum pengalaman seorang pengguna. Isi kutipan dan perilaku setelah wawancara atau observasi.</p>
+
+        <div class="empathy-toolbar stagger" style="--d:3">
+          <div style="display:flex;gap:7px;flex-wrap:wrap;" id="em-role-tabs">
+            <button type="button" class="pill-btn active" data-emrole="wali">Perspektif: Wali</button>
+            <button type="button" class="pill-btn" data-emrole="kasir">Perspektif: Kasir</button>
+            <button type="button" class="pill-btn" data-emrole="admin">Perspektif: Admin</button>
+          </div>
+          <div class="add-note-form">
+            <select id="em-quad-sel" class="studio-input" aria-label="Pilih kuadran">
+              <option value="says">SAYS</option>
+              <option value="thinks">THINKS</option>
+              <option value="does">DOES</option>
+              <option value="feels">FEELS</option>
+            </select>
+            <input type="text" id="em-note-input" class="studio-input" placeholder="Tambah temuan riset..." />
+            <button type="button" class="btn-primary" style="padding:7px 14px;font-size:12px;" id="em-add-btn">+ Tempel</button>
+          </div>
+        </div>
+
+        <div class="empathy-quads stagger" style="--d:4">
+          <div class="eq-box">
+            <div class="eq-head"><strong>SAYS</strong><span>Apa yang dikatakan?</span></div>
+            <p class="eq-quote" id="eq-q-says">“Bagian mana yang paling sering Anda buka?”</p>
+            <div class="eq-notes" id="eq-n-says"></div>
+          </div>
+          <div class="eq-box">
+            <div class="eq-head"><strong>THINKS</strong><span>Apa yang dipikirkan?</span></div>
+            <p class="eq-quote" id="eq-q-thinks">Apa yang mungkin ingin ia pastikan sebelum bertindak?</p>
+            <div class="eq-notes" id="eq-n-thinks"></div>
+          </div>
+          <div class="eq-box">
+            <div class="eq-head"><strong>DOES</strong><span>Apa yang dilakukan?</span></div>
+            <p class="eq-quote" id="eq-q-does">Amati alur nyata—bukan hanya langkah yang diceritakan.</p>
+            <div class="eq-notes" id="eq-n-does"></div>
+          </div>
+          <div class="eq-box">
+            <div class="eq-head"><strong>FEELS</strong><span>Apa yang dirasakan?</span></div>
+            <p class="eq-quote" id="eq-q-feels">Catat momen ragu, lega, bingung, atau percaya diri.</p>
+            <div class="eq-notes" id="eq-n-feels"></div>
+          </div>
+        </div>
+
+        <div class="grid g-5 stagger" style="--d:5; margin-top:11px;">
+          <div class="card" style="padding:11px;"><strong style="font-size:11.5px;">Interview</strong><p style="font-size:10.5px;color:var(--muted);">Gali pengalaman spesifik</p></div>
+          <div class="card" style="padding:11px;"><strong style="font-size:11.5px;">Observasi</strong><p style="font-size:10.5px;color:var(--muted);">Lihat perilaku di konteks nyata</p></div>
+          <div class="card" style="padding:11px;"><strong style="font-size:11.5px;">Survei</strong><p style="font-size:10.5px;color:var(--muted);">Kenali pola yang lebih luas</p></div>
+          <div class="card" style="padding:11px;"><strong style="font-size:11.5px;">Focus group</strong><p style="font-size:10.5px;color:var(--muted);">Bandingkan perspektif</p></div>
+          <div class="card" style="padding:11px;"><strong style="font-size:11.5px;">Sintesis</strong><p style="font-size:10.5px;color:var(--muted);">Kelompokkan ke empathy map</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 06: DEFINE - INTERACTIVE PROBLEM STATEMENT BUILDER -->
+    <section class="slide" data-phase="05 · DEFINE" data-title="Merumuskan Problem Statement" data-mode="light" data-bg="#faf8f2" data-ink="#0b362c" data-soft="#38574f" data-muted="#667b74" data-accent="#0b362c" data-accent2="#d97706" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">05 · Define</p>
+        <h2 class="stagger" style="--d:1">Ubah temuan menjadi <span class="accent-italic">masalah yang tepat.</span></h2>
+        <p class="lede stagger" style="--d:2">Rangkaikan data pengguna, insight, lalu problem statement. Masalah yang tajam memberi ruang bagi banyak solusi.</p>
+
+        <div class="grid g-3 stagger" style="--d:3">
+          <button type="button" class="card click-card selected" data-pspreset="wali">
+            <span class="tiny-label">Wali · hipotesis</span>
+            <h3 style="margin-top:6px;">Perlu memantau tanpa kebingungan</h3>
+            <p class="small">Validasi apakah saldo, limit, dan riwayat mudah dipahami dalam satu tampilan.</p>
+          </button>
+          <button type="button" class="card click-card" data-pspreset="kasir">
+            <span class="tiny-label">Kasir · hipotesis</span>
+            <h3 style="margin-top:6px;">Perlu bertransaksi dengan yakin</h3>
+            <p class="small">Validasi titik yang memperlambat pencarian santri dan konfirmasi belanja.</p>
+          </button>
+          <button type="button" class="card click-card" data-pspreset="admin">
+            <span class="tiny-label">Admin · hipotesis</span>
+            <h3 style="margin-top:6px;">Perlu kontrol yang dapat ditelusuri</h3>
+            <p class="small">Validasi kebutuhan laporan, approval, dan jejak aktivitas operasional.</p>
+          </button>
+        </div>
+
+        <div class="ps-builder stagger" style="--d:4">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <span class="tiny-label" style="color:var(--accent-2);">Interactive Problem Statement Builder (Klik kartu di atas atau edit teks langsung)</span>
+            <span class="tiny-label">Data pengguna → Insight → Problem statement</span>
+          </div>
+          <div class="ps-sentence">
+            “<input type="text" class="ps-inline-input" id="ps-user" value="Orang tua / wali santri" /> membutuhkan
+            <input type="text" class="ps-inline-input" id="ps-need" value="ringkasan saldo & batas belanja harian yang jelas" /> karena
+            <input type="text" class="ps-inline-input" id="ps-insight" value="mereka ingin memastikan uang saku anak cukup tanpa harus bertanya berulang kali" />.”
+          </div>
+        </div>
+
+        <div class="callout stagger" style="--d:5">
+          <span>✍️</span>
+          <span><strong>Formula:</strong> “[Pengguna] membutuhkan [kebutuhan] karena [insight/alasan].” Lengkapi bagian “karena” dengan temuan riset, bukan asumsi.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 07: HOW MIGHT WE? -->
+    <section class="slide" data-phase="06 · HOW MIGHT WE" data-title="How Might We?" data-mode="light" data-bg="#faf8f2" data-ink="#0b362c" data-soft="#38574f" data-muted="#667b74" data-accent="#0b362c" data-accent2="#d97706" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">06 · How Might We?</p>
+        <div class="hmw-banner stagger" style="--d:1">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <span class="eyebrow" style="color:#c8f560;margin:0;">Design challenge · hipotesis untuk divalidasi</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="pill-btn active" style="background:#c8f560;color:#0b362c;border-color:#c8f560;" data-hmw="wali">Wali & Santri</button>
+              <button type="button" class="pill-btn" style="color:#fff;" data-hmw="kasir">Kasir Kantin</button>
+              <button type="button" class="pill-btn" style="color:#fff;" data-hmw="admin">Admin Pondok</button>
+            </div>
+          </div>
+          <h2 id="hmw-main-q">Bagaimana kita dapat membantu wali memahami penggunaan saldo anak dengan jelas, tanpa mengurangi kemandirian santri?</h2>
+          <p id="hmw-sub" style="color:rgba(255,255,255,0.78);font-size:14px;">Pertanyaan ini cukup spesifik pada kebutuhan pengguna, sekaligus cukup terbuka untuk melahirkan banyak alternatif solusi.</p>
+        </div>
+
+        <div class="grid g-3 stagger" style="--d:2; margin-top:16px;">
+          <button type="button" class="hmw-check checked" onclick="this.classList.toggle('checked')"><span class="chk-box">✓</span>Mengutamakan kebutuhan wali & santri</button>
+          <button type="button" class="hmw-check checked" onclick="this.classList.toggle('checked')"><span class="chk-box">✓</span>Mendukung keputusan yang lebih tenang</button>
+          <button type="button" class="hmw-check checked" onclick="this.classList.toggle('checked')"><span class="chk-box">✓</span>Menjaga privasi dan batas akses</button>
+        </div>
+
+        <div class="grid g-2 stagger" style="--d:3; margin-top:14px;">
+          <p class="small"><strong>Uji sebelum mengunci:</strong> apakah ini masalah yang penting bagi wali? Apakah kebutuhan santri ikut terwakili?</p>
+          <p class="small"><strong>Ruang ide:</strong> ringkasan saldo · limit harian · notifikasi transaksi · riwayat · top-up praktis</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 08: IDEATE - SCAMPER EXPLORER -->
+    <section class="slide" data-phase="07 · IDEATE" data-title="Teknik Ideasi SCAMPER" data-mode="light" data-bg="#f6f4ec" data-ink="#173a32" data-soft="#3e5950" data-muted="#687a72" data-accent="#0d9488" data-accent2="#d97706" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">07 · Ideate</p>
+        <h2 class="stagger" style="--d:1">Lebarkan ruang kemungkinan.<br><span class="accent-italic">Kritik belakangan.</span></h2>
+        <p class="lede stagger" style="--d:2">Brainstorming dimulai dengan kuantitas. Tunda penilaian, kembangkan ide orang lain, dan kelompokkan setelah banyak alternatif muncul.</p>
+
+        <div class="scamper-grid stagger" style="--d:3">
+          <button type="button" class="scamper-btn active" data-sc="0"><div class="scamper-letter">S</div><strong style="display:block;font-size:11px;">Substitute</strong><span style="font-size:10px;color:var(--muted);">Apa yang bisa diganti?</span></button>
+          <button type="button" class="scamper-btn" data-sc="1"><div class="scamper-letter">C</div><strong style="display:block;font-size:11px;">Combine</strong><span style="font-size:10px;color:var(--muted);">Apa yang bisa digabung?</span></button>
+          <button type="button" class="scamper-btn" data-sc="2"><div class="scamper-letter">A</div><strong style="font-size:11px;">Adapt</strong><span style="font-size:10px;color:var(--muted);">Apa yang bisa diadaptasi?</span></button>
+          <button type="button" class="scamper-btn" data-sc="3"><div class="scamper-letter">M</div><strong style="font-size:11px;">Modify</strong><span style="font-size:10px;color:var(--muted);">Apa yang bisa diubah?</span></button>
+          <button type="button" class="scamper-btn" data-sc="4"><div class="scamper-letter">P</div><strong style="font-size:11px;">Put to use</strong><span style="font-size:10px;color:var(--muted);">Manfaat lain apa?</span></button>
+          <button type="button" class="scamper-btn" data-sc="5"><div class="scamper-letter">E</div><strong style="font-size:11px;">Eliminate</strong><span style="font-size:10px;color:var(--muted);">Apa yang dihilangkan?</span></button>
+          <button type="button" class="scamper-btn" data-sc="6"><div class="scamper-letter">R</div><strong style="font-size:11px;">Reverse</strong><span style="font-size:10px;color:var(--muted);">Bagaimana jika dibalik?</span></button>
+        </div>
+
+        <div class="inspector-box stagger" style="--d:4">
+          <div>
+            <span class="tiny-label" style="color:var(--accent);">Pemantik SCAMPER Aktif (Klik huruf di atas)</span>
+            <h3 id="sc-title" style="margin-top:4px;">S — Substitute (Mengganti)</h3>
+            <p class="small" id="sc-desc">Mengganti uang tunai dan buku catatan kertas di kantin dengan kartu RFID santri yang langsung memotong saldo digital.</p>
+          </div>
+          <div style="padding:11px 14px;border-radius:12px;background:var(--surface);font-size:12px;">
+            <strong style="color:var(--accent-2);">Aturan Sesi Brainstorming:</strong>
+            <p class="small" style="margin-top:4px;">Satu sticky note · Satu ide · Semua suara. Target sesi: minimal 10 ide, lalu pilih beberapa untuk diuji dampak dan kemudahannya.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 09: BANK IDE INTERAKTIF (12 STICKY NOTES + ADD & VOTE) -->
+    <section class="slide" data-phase="08 · BANK IDE" data-title="Bank Ide & Voting Workshop" data-mode="light" data-bg="#f6f4ec" data-ink="#173a32" data-soft="#3e5950" data-muted="#687a72" data-accent="#0d9488" data-accent2="#d97706" data-aink="#ffffff">
+      <div class="wrap wide">
+        <p class="eyebrow stagger" style="--d:0">08 · Bank ide</p>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;" class="stagger" style="--d:1">
+          <div>
+            <h2>Dua belas kemungkinan.<br><span class="accent-italic">Belum ada yang jadi jawaban final.</span></h2>
+            <p class="small">Contoh pemantik brainstorming berdasarkan ruang fitur PondokPay. Klik ★ untuk memberi vote atau tempel ide baru.</p>
+          </div>
+          <div class="add-note-form">
+            <input type="text" id="new-idea-input" class="studio-input" placeholder="Tulis ide baru dari wawancara..." style="min-width:230px;" />
+            <button type="button" class="btn-primary" style="padding:8px 15px;font-size:12px;" id="add-idea-btn">+ Tambah Ide</button>
+          </div>
+        </div>
+
+        <div class="sticky-grid stagger" style="--d:2" id="idea-bank-grid"></div>
+        <p class="small stagger" style="--d:3; margin-top:12px;">Pilih ide karena menjawab kebutuhan yang ditemukan—bukan karena terlihat paling canggih.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: MATRIKS PRIORITAS DAMPAK x KEMUDAHAN -->
+    <section class="slide" data-phase="09 · PRIORITAS" data-title="Matriks Dampak × Kemudahan" data-mode="light" data-bg="#f6f4ec" data-ink="#173a32" data-soft="#3e5950" data-muted="#687a72" data-accent="#0d9488" data-accent2="#d97706" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">09 · Pilih untuk diuji</p>
+        <h2 class="stagger" style="--d:1">Dampak × kemudahan.<br><span class="accent-italic">Lalu validasi prioritasnya.</span></h2>
+        <p class="lede stagger" style="--d:2">Matriks ini adalah alat diskusi tim, bukan hasil riset. Klik chip ide pada kuadran untuk mengeksplorasi hipotesis pengujiannya.</p>
+
+        <div class="matrix-split stagger" style="--d:3">
+          <div class="matrix-board">
+            <div class="quad-box">
+              <span class="tiny-label" style="color:#0f4c3a;">High impact · Easier (Prioritas Utama)</span>
+              <div>
+                <button type="button" class="m-chip selected" data-mx="Ringkasan wali|Satu prototype untuk menguji apakah saldo, aktivitas hari ini, dan tindakan berikutnya terasa jelas.|Hipotesis: pengguna lebih cepat menemukan informasi penting. Ukur saat uji tugas, jangan menganggap benar sebelum diuji.">Ringkasan wali</button>
+                <button type="button" class="m-chip" data-mx="Atur limit|Menguji apakah wali memahami pengaturan batas belanja harian dan dampaknya pada transaksi kantin.|Hipotesis: kontrol limit harian menurunkan kecemasan wali terhadap pemborosan uang saku.">Atur limit</button>
+                <button type="button" class="m-chip" data-mx="Riwayat|Menguji kejelasan rincian waktu, nama kantin, dan nominal pada daftar riwayat transaksi.|Hipotesis: rincian yang rapi mengurangi pertanyaan berulang wali kepada pengurus pondok.">Riwayat</button>
+              </div>
+            </div>
+            <div class="quad-box">
+              <span class="tiny-label">High impact · Harder</span>
+              <div>
+                <button type="button" class="m-chip" data-mx="Notifikasi real-time|Menguji antrean pesan WhatsApp saat transaksi terjadi dengan opsi opt-in bagi wali.|Hipotesis: notifikasi instan memberi rasa tenang tanpa mengganggu aktivitas harian wali.">Notifikasi real-time</button>
+                <button type="button" class="m-chip" data-mx="Analitik prediktif|Estimasi kapan saldo santri akan habis berdasarkan rata-rata belanja harian.|Hipotesis: pengingat prediktif membantu wali melakukan top-up tepat waktu sebelum saldo kosong.">Analitik prediktif</button>
+              </div>
+            </div>
+            <div class="quad-box">
+              <span class="tiny-label">Lower impact · Easier</span>
+              <div>
+                <button type="button" class="m-chip" data-mx="Tema warna|Kustomisasi tampilan visual ringan pada profil aplikasi wali.|Hipotesis: menyenangkan secara visual namun bukan prioritas utama pemecahan masalah inti.">Tema warna</button>
+                <button type="button" class="m-chip" data-mx="Badge dekoratif|Lencana pencapaian hemat bagi santri yang belanja di bawah limit harian.|Hipotesis: menarik sebagai gamifikasi ringan setelah alur transaksi utama stabil.">Badge dekoratif</button>
+              </div>
+            </div>
+            <div class="quad-box">
+              <span class="tiny-label">Lower impact · Harder</span>
+              <div>
+                <button type="button" class="m-chip" data-mx="Alur tambahan|Langkah konfirmasi berlapis yang justru memperlambat antrean kasir kantin.|Hipotesis: berisiko menambah friksi operasional tanpa nilai tambah yang sepadan.">Alur tambahan</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="card" style="background:#edf4e9;border-color:#c6d9c8;">
+            <span class="tiny-label" style="color:#0f4c3a;">Contoh pilihan awal</span>
+            <h3 id="mx-title" style="font-size:21px;margin:8px 0;">Ringkasan wali</h3>
+            <p class="small" id="mx-desc" style="color:#385247;">Satu prototype untuk menguji apakah saldo, aktivitas hari ini, dan tindakan berikutnya terasa jelas.</p>
+            <div class="callout" style="margin-top:14px;">
+              <span id="mx-hyp"><strong>Hipotesis:</strong> pengguna lebih cepat menemukan informasi penting. Ukur saat uji tugas, jangan menganggap benar sebelum diuji.</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 11: PROTOTYPE CANVAS & FIDELITY LEVELS -->
+    <section class="slide" data-phase="10 · PROTOTYPE CANVAS" data-title="Prototype Canvas & Fidelitas" data-mode="light" data-bg="#eef3f0" data-ink="#173a32" data-soft="#3e5950" data-muted="#667a73" data-accent="#18745a" data-accent2="#0284c7" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">10 · Prototype canvas</p>
+        <h2 class="stagger" style="--d:1">Buat secukupnya <span class="accent-italic">untuk memperoleh pembelajaran.</span></h2>
+        <p class="lede stagger" style="--d:2">Prototype tidak harus sempurna. Pilih bentuk yang paling cepat menguji asumsi berisiko.</p>
+
+        <div class="grid g-2 stagger" style="--d:3">
+          <div class="card"><span class="tiny-label" style="color:var(--accent);">Target pengguna</span><p class="small" style="margin-top:6px;">Wali yang memantau transaksi anak melalui ponsel.</p></div>
+          <div class="card"><span class="tiny-label" style="color:var(--accent);">Masalah · hipotesis</span><p class="small" style="margin-top:6px;">Informasi saldo, limit, dan riwayat mungkin sulit dipahami saat tersebar.</p></div>
+          <div class="card"><span class="tiny-label" style="color:var(--accent);">Solusi yang diuji</span><p class="small" style="margin-top:6px;">Satu halaman ringkas dengan saldo, aktivitas hari ini, dan pintasan tindakan.</p></div>
+          <div class="card"><span class="tiny-label" style="color:var(--accent);">Asumsi berisiko</span><p class="small" style="margin-top:6px;">Wali memahami label, merasa data cukup jelas, dan tetap nyaman dengan privasinya.</p></div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;" class="stagger" style="--d:4">
+          <button type="button" class="pill-btn active" data-fid="0">1 · Sketsa</button>
+          <button type="button" class="pill-btn" data-fid="1">2 · Wireframe</button>
+          <button type="button" class="pill-btn" data-fid="2">3 · Mockup</button>
+          <button type="button" class="pill-btn" data-fid="3">4 · Role Play</button>
+          <button type="button" class="pill-btn" data-fid="4">5 · Storyboard</button>
+        </div>
+
+        <div class="inspector-box stagger" style="--d:5">
+          <div>
+            <span class="tiny-label" style="color:var(--accent);">Tingkat Detail Prototype</span>
+            <h3 id="fid-title" style="margin-top:4px;">1 · Sketsa Kertas (Low-Fidelity)</h3>
+            <p class="small" id="fid-desc">Coretan cepat tata letak kartu saldo dan tombol aksi dalam 5 menit untuk menguji urutan informasi paling penting.</p>
+          </div>
+          <div style="font-size:12px;color:var(--ink-soft);">
+            <strong>Aturan:</strong> prototype adalah pertanyaan yang bisa dicoba, bukan janji bahwa desain sudah benar.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 12: LIVE INTERACTIVE PROTOTYPE PONSEL WALI -->
+    <section class="slide" data-phase="11 · PROTOTYPE KONSEP" data-title="Uji Prototype Ponsel Wali" data-mode="light" data-bg="#eef3f0" data-ink="#173a32" data-soft="#3e5950" data-muted="#667a73" data-accent="#18745a" data-accent2="#0284c7" data-aink="#ffffff">
+      <div class="wrap">
+        <div class="proto-split">
+          <div>
+            <p class="eyebrow stagger" style="--d:0">11 · Prototype konsep (Interaktif)</p>
+            <h2 class="stagger" style="--d:1">Informasi penting, <span class="accent-italic">terlihat sekilas.</span></h2>
+            <p class="lede stagger" style="--d:2">Contoh tampilan ringkasan wali untuk diuji. Angka dan nama di sini fiktif—tidak berasal dari data santri atau akun produksi.</p>
+            <ul style="padding-left:18px;font-size:13.5px;line-height:1.8;color:var(--ink-soft);" class="stagger" style="--d:3">
+              <li>Saldo tersedia mudah ditemukan.</li>
+              <li>Penggunaan limit harian punya konteks dan sisa batas.</li>
+              <li>Riwayat singkat membantu meninjau aktivitas.</li>
+              <li>Tombol top-up dan pengaturan limit tampak jelas.</li>
+            </ul>
+            <div class="callout stagger" style="--d:4">
+              <span>👁️</span>
+              <span><strong>Uji prototype:</strong> klik tombol di dalam ponsel di samping untuk menyimulasikan top-up, mengubah limit harian, atau belanja kantin!</span>
+            </div>
+          </div>
+
+          <div class="live-phone stagger" style="--d:2">
+            <div class="live-screen">
+              <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:#44594e;margin-bottom:14px;">
+                <span>9:41</span><span>●●● ▰</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <div><small style="color:#6d7e75;font-size:10.5px;">Assalamu’alaikum,</small><strong style="display:block;font-size:15px;">Bu Aisyah</strong></div>
+                <span style="width:30px;height:30px;border-radius:10px;background:#e1efe4;color:#155a47;display:grid;place-items:center;font-weight:800;font-size:11px;">AA</span>
+              </div>
+              <div class="wallet-hero" style="margin-top:0;">
+                <small>Saldo tersedia · FIKTIF</small>
+                <strong id="pr-bal">Rp 245.000</strong>
+                <div class="wallet-bar"><i id="pr-bar" style="width:36%;"></i></div>
+                <div class="wallet-foot"><span>Belanja hari ini</span><span id="pr-spend">Rp 18.000 / Rp 50.000</span></div>
+              </div>
+              <div class="phone-btns">
+                <button type="button" class="phone-act-btn" id="pr-btn-topup">＋ Top-up saldo</button>
+                <button type="button" class="phone-act-btn" id="pr-btn-limit">⌁ Atur limit</button>
+              </div>
+              <div class="sim-drawer" id="pr-limit-drawer" style="display:none;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                  <span>Batas Belanja Harian:</span>
+                  <strong id="pr-lim-val" style="color:#155a47;">Rp 50.000</strong>
+                </div>
+                <input type="range" id="pr-lim-slider" min="20000" max="100000" step="5000" value="50000" style="width:100%;accent-color:#155a47;cursor:pointer;" />
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 4px;">
+                <strong style="font-size:12px;">Transaksi terbaru</strong>
+                <button type="button" id="pr-sim-buy" style="font-size:10px;padding:3px 8px;border-radius:7px;border:1px solid #cbd7cf;background:#fff;cursor:pointer;">+ Simulasi Jajan 10rb</button>
+              </div>
+              <div id="pr-tx-list">
+                <div class="tx-item"><div><b>Kantin Sehat</b><span>Hari ini · 10.24</span></div><strong>− Rp 12.000</strong></div>
+                <div class="tx-item"><div><b>Top-up saldo</b><span>Kemarin · 16.02</span></div><strong style="color:#155a47;">+ Rp 100.000</strong></div>
+                <div class="tx-item"><div><b>Koperasi pondok</b><span>Kemarin · 12.10</span></div><strong>− Rp 8.000</strong></div>
+              </div>
+              <p class="tiny-label" style="margin-top:12px;text-align:center;">KONSEP PROTOTYPE · BUKAN DATA PRODUKSI</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 13: TEST - OBSERVE, ASK, LEARN -->
+    <section class="slide" data-phase="12 · TEST" data-title="Skenario & Observasi Uji" data-mode="light" data-bg="#eef3f0" data-ink="#173a32" data-soft="#3e5950" data-muted="#667a73" data-accent="#18745a" data-accent2="#0284c7" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">12 · Test</p>
+        <h2 class="stagger" style="--d:1">Uji pengalaman, <span class="accent-italic">bukan kemampuan pengguna.</span></h2>
+        <p class="lede stagger" style="--d:2">Ajak 3–5 orang yang relevan bila memungkinkan. Beri tugas sederhana, amati tanpa mengarahkan, lalu tanyakan pengalaman mereka.</p>
+
+        <div class="grid g-3 stagger" style="--d:3">
+          <div class="card"><div style="display:flex;justify-content:space-between;"><h3>OBSERVE</h3><span class="num-serif" style="margin:0;">01</span></div><p class="small" style="margin-top:8px;">Di mana pengguna mulai? Bagian mana yang dibaca ulang? Kapan mereka berhenti atau meminta bantuan?</p></div>
+          <div class="card"><div style="display:flex;justify-content:space-between;"><h3>ASK</h3><span class="num-serif" style="margin:0;">02</span></div><p class="small" style="margin-top:8px;">“Apa yang paling membantu?” “Apa yang membingungkan?” “Apa yang akan Anda ubah?”</p></div>
+          <div class="card"><div style="display:flex;justify-content:space-between;"><h3>LEARN</h3><span class="num-serif" style="margin:0;">03</span></div><p class="small" style="margin-top:8px;">Catat pola, tingkat dampak, dan kebutuhan yang belum terjawab. Tentukan iterasi berikutnya.</p></div>
+        </div>
+
+        <div class="grid g-3 stagger" style="--d:4; margin-top:14px;">
+          <div class="card" style="background:#edf3e8;">
+            <span class="tiny-label" style="color:var(--accent);">Tugas 1</span>
+            <p style="font-size:12.5px;margin:6px 0 10px;">Temukan saldo anak Anda dan jelaskan apa artinya.</p>
+            <button type="button" class="pill-btn task-status-btn" style="font-size:11px;padding:4px 10px;">Status: Belum diuji</button>
+          </div>
+          <div class="card" style="background:#edf3e8;">
+            <span class="tiny-label" style="color:var(--accent);">Tugas 2</span>
+            <p style="font-size:12.5px;margin:6px 0 10px;">Cari jumlah belanja hari ini dan sisa limitnya.</p>
+            <button type="button" class="pill-btn task-status-btn" style="font-size:11px;padding:4px 10px;">Status: Belum diuji</button>
+          </div>
+          <div class="card" style="background:#edf3e8;">
+            <span class="tiny-label" style="color:var(--accent);">Tugas 3</span>
+            <p style="font-size:12.5px;margin:6px 0 10px;">Tunjukkan cara mengatur limit harian atau top-up.</p>
+            <button type="button" class="pill-btn task-status-btn" style="font-size:11px;padding:4px 10px;">Status: Belum diuji</button>
+          </div>
+        </div>
+        <p class="small stagger" style="--d:5; margin-top:12px;">Jelaskan bahwa yang diuji adalah desain, bukan kecakapan orangnya. Minta izin sebelum mencatat atau merekam.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 14: FEEDBACK BERKUALITAS & CAPTURE GRID -->
+    <section class="slide" data-phase="13 · FEEDBACK" data-title="Feedback Berkualitas & Lembar Tangkap" data-mode="light" data-bg="#eef3f0" data-ink="#173a32" data-soft="#3e5950" data-muted="#667a73" data-accent="#18745a" data-accent2="#0284c7" data-aink="#ffffff">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">13 · Feedback berkualitas</p>
+        <h2 class="stagger" style="--d:1">Spesifik. Berbasis pengalaman. <span class="accent-italic">Bisa ditindaklanjuti.</span></h2>
+        <p class="lede stagger" style="--d:2">Contoh di bawah adalah format latihan, bukan hasil uji pengguna PondokPay.</p>
+
+        <div class="grid g-3 stagger" style="--d:3">
+          <div class="card" style="background:#f6e8df;"><span class="tiny-label">Terlalu umum</span><p style="font-family:var(--font-serif);font-size:21px;margin:8px 0;">“Bagus.”</p><p class="small">Tidak menjelaskan momen yang membantu atau yang perlu diperbaiki.</p></div>
+          <div class="card" style="background:#eef3e7;"><span class="tiny-label">Spesifik</span><p style="font-family:var(--font-serif);font-size:21px;margin:8px 0;">“Saya perlu mencari dulu jumlah belanja hari ini.”</p><p class="small">Mengacu pada pengalaman dalam tugas tertentu.</p></div>
+          <div class="card" style="background:#eceaf2;"><span class="tiny-label">Dapat ditindaklanjuti</span><p style="font-family:var(--font-serif);font-size:21px;margin:8px 0;">“Pindahkan sisa limit ke dekat ringkasan saldo.”</p><p class="small">Memberi petunjuk yang bisa diuji pada iterasi berikutnya.</p></div>
+        </div>
+
+        <div class="capture-grid stagger" style="--d:4">
+          <div class="capture-col"><span class="tiny-label" style="color:var(--accent);">Apa yang diuji?</span><textarea placeholder="Tugas / alur / asumsi..."></textarea></div>
+          <div class="capture-col"><span class="tiny-label" style="color:var(--accent);">Apa yang diamati?</span><textarea placeholder="Perilaku / hambatan..."></textarea></div>
+          <div class="capture-col"><span class="tiny-label" style="color:var(--accent);">Feedback pengguna</span><textarea placeholder="Kutipan persis..."></textarea></div>
+          <div class="capture-col"><span class="tiny-label" style="color:var(--accent);">Perbaikan berikutnya</span><textarea placeholder="Satu perubahan yang diuji..."></textarea></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 15: ITERASI & CHALLENGE KELOMPOK -->
+    <section class="slide" data-phase="14 · ITERASI & WORKSHOP" data-title="Siklus Iterasi & Challenge Kelompok" data-mode="dark" data-bg="#091f1a" data-ink="#f7f5ee" data-soft="#d4e0da" data-muted="#8ea69c" data-accent="#34d399" data-accent2="#c8f560" data-aink="#091f1a">
+      <div class="wrap">
+        <p class="eyebrow stagger" style="--d:0">14 · Iterasi & praktik kelompok</p>
+        <h2 class="stagger" style="--d:1">Test menghasilkan <span class="accent-italic">pembelajaran, bukan sekadar nilai.</span></h2>
+
+        <div class="grid g-5 stagger" style="--d:2; margin-top:16px;">
+          <div class="card"><span class="num-serif">01</span><h3>Prototype</h3><p class="small">Satu asumsi yang dapat diuji</p></div>
+          <div class="card"><span class="num-serif">02</span><h3>Test</h3><p class="small">Berikan tugas yang realistis</p></div>
+          <div class="card"><span class="num-serif">03</span><h3>Feedback</h3><p class="small">Catat pola dan friksi</p></div>
+          <div class="card"><span class="num-serif">04</span><h3>Improve</h3><p class="small">Prioritaskan perbaikan</p></div>
+          <div class="card"><span class="num-serif">05</span><h3>Retest</h3><p class="small">Pastikan perubahan membantu</p></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.35fr 0.65fr;gap:18px;margin-top:18px;align-items:center;" class="stagger" style="--d:3">
+          <div>
+            <span class="tiny-label">Output challenge kelompok (Klik untuk tandai selesai)</span>
+            <div class="grid g-3" style="margin-top:8px;">
+              <button type="button" class="hmw-check" onclick="this.classList.toggle('checked')"><span class="chk-box">01</span>Problem statement</button>
+              <button type="button" class="hmw-check" onclick="this.classList.toggle('checked')"><span class="chk-box">02</span>How Might We</button>
+              <button type="button" class="hmw-check" onclick="this.classList.toggle('checked')"><span class="chk-box">03</span>10+ alternatif ide</button>
+              <button type="button" class="hmw-check" onclick="this.classList.toggle('checked')"><span class="chk-box">04</span>Satu prototype</button>
+              <button type="button" class="hmw-check" onclick="this.classList.toggle('checked')"><span class="chk-box">05</span>3 feedback utama</button>
+              <button type="button" class="hmw-check" onclick="this.classList.toggle('checked')"><span class="chk-box">06</span>Rencana iterasi</button>
+            </div>
+          </div>
+
+          <aside class="card" style="background:rgba(52,211,153,0.12);border-color:var(--accent);">
+            <small style="color:var(--ink-soft);font-size:11px;">Ritme workshop yang disarankan</small>
+            <div style="font-family:var(--font-serif);font-size:38px;color:var(--accent);margin:4px 0;">45–60 mnt</div>
+            <p class="small">Empathize → define → ideate → prototype → test. Sesuaikan dengan akses pengguna dan konteks pondok.</p>
+          </aside>
+        </div>
+        <p class="small stagger" style="--d:4; margin-top:12px;">Fail fast · Learn fast · Improve fast — dengan tetap menjaga privasi, persetujuan, dan keamanan data.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 16: CLOSING -->
+    <section class="slide" data-phase="PENUTUP · PONDOKPAY" data-title="Penutup: Proses Memahami Masalah" data-mode="dark" data-bg="#091f1a" data-ink="#f7f5ee" data-soft="#d4e0da" data-muted="#8ea69c" data-accent="#c8f560" data-accent2="#34d399" data-aink="#091f1a">
+      <div class="wrap">
+        <div class="card stagger" style="--d:0; padding:clamp(28px, 4.5vw, 56px); border-color:rgba(200,245,96,0.28);">
+          <p class="eyebrow">PondokPay · Design Thinking</p>
+          <h2 style="font-size:clamp(36px, 5vw, 66px);margin:12px 0 18px;">Jangan jatuh cinta pada solusi.<br><span class="accent-italic">Jatuh cintalah pada proses memahami masalah.</span></h2>
+          <p class="lede">Mulai dengan satu percakapan. Dengarkan pengalaman nyata. Buat perubahan kecil yang bisa diuji—lalu perbaiki bersama.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">
+            <button type="button" class="btn-primary" onclick="goSlide(0)">↺ Ulangi dari Awal</button>
+            <button type="button" class="pill-btn" onclick="toggleOverview(true)">▦ Lihat Peta 16 Slide</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:30px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);">
+            <span><strong style="color:var(--ink);">EMPATHIZE</strong> · DEFINE · IDEATE · PROTOTYPE · TEST</span>
+            <span>Disusun untuk workshop PondokPay · 2026</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Scrubber Bar -->
+  <footer class="bottombar">
+    <div class="counter-box"><strong id="cur-num">01</strong> / <span id="tot-num">16</span></div>
+    <div class="scrubber" id="scrubber" role="tablist" aria-label="Pilih tampilan presentasi"></div>
+    <div class="nav-btns">
+      <button type="button" class="nav-btn" id="btn-prev" aria-label="Tampilan sebelumnya">←</button>
+      <button type="button" class="nav-btn" id="btn-next" aria-label="Tampilan berikutnya">→</button>
+    </div>
+  </footer>
+
+  <!-- Overview Grid Modal -->
+  <div class="modal-overlay" id="overview-modal" aria-hidden="true">
+    <div class="overview-box" role="dialog" aria-modal="true" aria-labelledby="ov-heading">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <span class="eyebrow" style="margin-bottom:4px;">Peta Presentasi Design Thinking</span>
+          <h2 id="ov-heading" style="font-size:28px;margin:0;color:#f7f5ee;">Pilih Tahap atau Slide</h2>
+        </div>
+        <button type="button" class="pill-btn" id="close-overview" style="color:#f7f5ee;">× Tutup</button>
+      </div>
+      <div class="ov-grid" id="ov-grid"></div>
+    </div>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll('.slide')];
+    let current = 0;
+
+    // Workshop Countdown Timer (45:00)
+    let wsSeconds = 45 * 60;
+    let wsInterval = null;
+    const wsClock = document.getElementById('ws-clock');
+    const wsStart = document.getElementById('ws-start');
+    function updateClock() {
+      const m = String(Math.floor(wsSeconds / 60)).padStart(2, '0');
+      const s = String(wsSeconds % 60).padStart(2, '0');
+      wsClock.textContent = `${m}:${s}`;
+    }
+    wsStart.addEventListener('click', () => {
+      if (wsInterval) {
+        clearInterval(wsInterval);
+        wsInterval = null;
+        wsStart.textContent = '▶';
+      } else {
+        wsStart.textContent = '⏸';
+        wsInterval = setInterval(() => {
+          if (wsSeconds > 0) { wsSeconds--; updateClock(); }
+        }, 1000);
+      }
+    });
+    document.getElementById('ws-reset').addEventListener('click', () => {
+      clearInterval(wsInterval);
+      wsInterval = null;
+      wsStart.textContent = '▶';
+      wsSeconds = 45 * 60;
+      updateClock();
+    });
+
+    // Build Scrubber & Overview Grid
+    const scrubber = document.getElementById('scrubber');
+    const ovGrid = document.getElementById('ov-grid');
+    slides.forEach((s, i) => {
+      const seg = document.createElement('button');
+      seg.type = 'button';
+      seg.className = 'scrub-seg';
+      seg.title = `${String(i + 1).padStart(2, '0')} · ${s.dataset.title}`;
+      seg.addEventListener('click', () => goSlide(i));
+      scrubber.appendChild(seg);
+
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'ov-card';
+      card.innerHTML = `<span>SLIDE ${String(i + 1).padStart(2, '0')} · ${s.dataset.phase}</span><strong>${s.dataset.title}</strong>`;
+      card.addEventListener('click', () => { goSlide(i); toggleOverview(false); });
+      ovGrid.appendChild(card);
+    });
+
+    function goSlide(idx) {
+      current = Math.max(0, Math.min(slides.length - 1, idx));
+      slides.forEach((s, i) => {
+        s.classList.toggle('is-active', i === current);
+        if (i === current) s.scrollTop = 0;
+      });
+
+      const cur = slides[current];
+      const root = document.documentElement.style;
+      root.setProperty('--bg', cur.dataset.bg);
+      root.setProperty('--ink', cur.dataset.ink);
+      root.setProperty('--ink-soft', cur.dataset.soft);
+      root.setProperty('--muted', cur.dataset.muted);
+      root.setProperty('--accent', cur.dataset.accent);
+      root.setProperty('--accent-2', cur.dataset.accent2);
+      root.setProperty('--accent-ink', cur.dataset.aink);
+      document.body.classList.toggle('theme-light', cur.dataset.mode === 'light');
+
+      document.getElementById('phase-text').textContent = cur.dataset.phase;
+      document.getElementById('cur-num').textContent = String(current + 1).padStart(2, '0');
+      document.getElementById('btn-prev').disabled = current === 0;
+      document.getElementById('btn-next').disabled = current === slides.length - 1;
+
+      [...scrubber.children].forEach((seg, i) => {
+        seg.classList.toggle('passed', i < current);
+        seg.classList.toggle('current', i === current);
+      });
+      [...ovGrid.children].forEach((c, i) => c.classList.toggle('active', i === current));
+      history.replaceState(null, '', `#slide-${current + 1}`);
+    }
+
+    document.getElementById('btn-prev').addEventListener('click', () => goSlide(current - 1));
+    document.getElementById('btn-next').addEventListener('click', () => goSlide(current + 1));
+    document.getElementById('brand-home').addEventListener('click', () => goSlide(0));
+
+    // Slide 01: Interactive Cover Phone & 3D Tilt
+    const covPhone = document.getElementById('cover-phone');
+    covPhone.addEventListener('mousemove', e => {
+      const r = covPhone.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      covPhone.style.transform = `rotateY(${x * 16}deg) rotateX(${-y * 16}deg)`;
+    });
+    covPhone.addEventListener('mouseleave', () => { covPhone.style.transform = 'rotateY(0deg) rotateX(0deg)'; });
+
+    let covBal = 245000;
+    let covLim = 50000;
+    document.getElementById('cov-topup').addEventListener('click', () => {
+      covBal += 50000;
+      document.getElementById('cov-bal').textContent = 'Rp ' + covBal.toLocaleString('id-ID');
+      const row = document.createElement('div');
+      row.className = 'tx-item';
+      row.innerHTML = `<div><b>Top-up cepat</b><span>Baru saja</span></div><strong style="color:#155a47;">+ Rp 50.000</strong>`;
+      document.getElementById('cov-tx-list').prepend(row);
+    });
+    document.getElementById('cov-limit').addEventListener('click', () => {
+      covLim = covLim === 50000 ? 75000 : covLim === 75000 ? 30000 : 50000;
+      document.getElementById('cov-lim').textContent = `Rp 18.000 / ${covLim.toLocaleString('id-ID')}`;
+      document.getElementById('cov-bar').style.width = Math.min(100, Math.round((18000 / covLim) * 100)) + '%';
+    });
+
+    // Slide 02: 5 Principles Inspector
+    const principlesData = [
+      { t: '01 · Human-centered di PondokPay', d: 'Merancang layar wali agar sisa saldo dan batas jajan harian terbaca dalam 3 detik tanpa istilah akuntansi yang rumit.', s: 'Dari "fitur apa lagi yang bisa kita koding?" → menjadi "apa yang membuat wali tenang dan kasir cepat?"' },
+      { t: '02 · Empathy di PondokPay', d: 'Mengamati langsung suasana kantin pondok saat jam istirahat untuk melihat hambatan nyata kasir dan santri.', s: 'Dari "mengira kasir butuh banyak tombol" → menjadi "kasir butuh konfirmasi nominal yang cepat & minim salah ketik."' },
+      { t: '03 · Kolaborasi Lintas Peran', d: 'Melibatkan pengasuh pondok, pengelola kantin, orang tua, dan santri sejak perumusan masalah.', s: 'Dari "keputusan sepihak tim teknis" → menjadi "solusi yang disepakati seluruh ekosistem pondok."' },
+      { t: '04 · Eksperimen Terarah', d: 'Menguji sketsa & mockup interaktif layar wali sebelum membangun integrasi pembayaran penuh.', s: 'Dari "menunggu semua fitur selesai baru diuji" → menjadi "belajar dari prototipe kecil sejak minggu pertama."' },
+      { t: '05 · Iterasi Berkelanjutan', d: 'Memindahkan indikator sisa limit harian ke kartu saldo utama setelah uji coba menunjukkan wali sempat mencarinya.', s: 'Dari "sekali rilis selesai" → menjadi "siklus perbaikan berbasis umpan balik nyata."' }
+    ];
+    document.querySelectorAll('[data-pidx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-pidx]').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const item = principlesData[Number(btn.dataset.pidx)];
+        document.getElementById('pr-title').textContent = item.t;
+        document.getElementById('pr-desc').textContent = item.d;
+        document.getElementById('pr-shift').textContent = item.s;
+      });
+    });
+
+    // Slide 03: 5 Stages Inspector
+    const stagesData = [
+      { t: '01 · EMPATHIZE — Pahami Manusia', d: 'Mengamati antrean kantin saat istirahat dan mewawancarai wali santri tentang kekhawatiran uang saku.', o: 'Output: Empathy Map & kutipan pengguna. Jika saat Test ditemukan konteks baru, kembali ke sini.' },
+      { t: '02 · DEFINE — Tentukan Masalah', d: 'Menyaring temuan lapangan menjadi Problem Statement dan pertanyaan How Might We yang tajam.', o: 'Output: Rumusan masalah terfokus. Jika ide terasa melebar, kembali periksa rumusan masalah ini.' },
+      { t: '03 · IDEATE — Perbanyak Opsi', d: 'Brainstorming terbuka menggunakan teknik SCAMPER lalu memetakan ide pada matriks Dampak × Kemudahan.', o: 'Output: Bank ide & kandidat prototipe prioritas.' },
+      { t: '04 · PROTOTYPE — Buat untuk Belajar', d: 'Membangun purwarupa layar ringkasan wali yang cukup realistis untuk diuji tanpa biaya pengembangan penuh.', o: 'Output: Prototype Canvas & mockup interaktif siap uji.' },
+      { t: '05 · TEST — Dengar Feedback', d: 'Memberikan 3 tugas nyata kepada wali/kasir, mengamati di mana mereka ragu, lalu menyusun iterasi berikutnya.', o: 'Output: Feedback Capture Grid & rencana perbaikan.' }
+    ];
+    document.querySelectorAll('[data-stidx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-stidx]').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const item = stagesData[Number(btn.dataset.stidx)];
+        document.getElementById('st-title').textContent = item.t;
+        document.getElementById('st-desc').textContent = item.d;
+        document.getElementById('st-out').textContent = item.o;
+      });
+    });
+
+    // Slide 04: Role Research Guide
+    const rolesGuide = [
+      { t: 'Pertanyaan Riset untuk Orang Tua / Wali', q: '“Kapan terakhir kali Ibu/Bapak merasa ragu soal sisa uang saku anak di pondok, dan informasi apa yang paling menenangkan saat membuka aplikasi?”', c: 'Umumnya mengecek ponsel pada malam hari atau akhir pekan dengan koneksi seluler standar.' },
+      { t: 'Pertanyaan Riset untuk Kasir Kantin', q: '“Bagian mana saat jam istirahat ramai yang paling sering memperlambat transaksi atau membuat kasir ragu?”', c: 'Lingkungan ramai, waktu layanan singkat (15–20 menit istirahat), butuh kontras layar tinggi.' },
+      { t: 'Pertanyaan Riset untuk Admin Pondok', q: '“Data transaksi atau persetujuan pencairan apa yang paling sering diperiksa saat tutup buku harian?”', c: 'Bekerja menggunakan desktop/laptop dengan fokus pada akurasi ledger dan jejak audit.' }
+    ];
+    document.querySelectorAll('[data-roleidx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-roleidx]').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const r = rolesGuide[Number(btn.dataset.roleidx)];
+        document.getElementById('rl-title').textContent = r.t;
+        document.getElementById('rl-q').textContent = r.q;
+        document.getElementById('rl-ctx').textContent = r.c;
+      });
+    });
+
+    // Slide 05: Interactive Empathy Map
+    const empathyStore = {
+      wali: {
+        quotes: { says: '“Bagian mana yang paling sering Anda buka?”', thinks: 'Apa yang mungkin ingin ia pastikan sebelum bertindak?', does: 'Amati alur nyata—bukan hanya langkah yang diceritakan.', feels: 'Catat momen ragu, lega, bingung, atau percaya diri.' },
+        notes: {
+          says: ['“Saya ingin tahu anak jajan apa saja minggu ini.”'],
+          thinks: ['Apakah saldo masih cukup sampai akhir bulan?'],
+          does: ['Membuka riwayat transaksi setelah menerima pesan WA.'],
+          feels: ['Tenang saat sisa limit harian terlihat jelas.']
+        }
+      },
+      kasir: {
+        quotes: { says: '“Kalau jam istirahat, antrean cepat menumpuk.”', thinks: 'Apakah saldo santri ini cukup untuk belanjaannya?', does: 'Mencari nama/RFID santri lalu memverifikasi nominal.', feels: 'Percaya diri saat konfirmasi transaksi instan & jelas.' },
+        notes: {
+          says: ['“Jangan sampai salah potong saldo santri.”'],
+          thinks: ['Berapa sisa limit harian anak ini hari ini?'],
+          does: ['Mengecek ulang daftar item sebelum menekan konfirmasi.'],
+          feels: ['Lega ketika sistem otomatis menolak transaksi melebihi limit.']
+        }
+      },
+      admin: {
+        quotes: { says: '“Semua mutasi kantin dan wali harus klop.”', thinks: 'Siapa yang menyetujui pencairan saldo kantin ini?', does: 'Memeriksa log audit dan laporan finansial berkala.', feels: 'Yakin saat setiap transaksi memiliki jejak tercatat.' },
+        notes: {
+          says: ['“Ekspor laporan bulanan harus rapi untuk yayasan.”'],
+          thinks: ['Apakah ada anomali top-up atau koreksi kas?'],
+          does: ['Meninjau antrean approval finansial setiap sore.'],
+          feels: ['Terbantu dengan pemisahan hak akses tiap peran.']
+        }
+      }
+    };
+    let activeEmRole = 'wali';
+    function renderEmpathy() {
+      const data = empathyStore[activeEmRole];
+      ['says', 'thinks', 'does', 'feels'].forEach(q => {
+        document.getElementById(`eq-q-${q}`).textContent = data.quotes[q];
+        const box = document.getElementById(`eq-n-${q}`);
+        box.innerHTML = data.notes[q].map(txt => `<span class="eq-chip">${txt}</span>`).join('');
+      });
+    }
+    document.querySelectorAll('[data-emrole]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-emrole]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeEmRole = btn.dataset.emrole;
+        renderEmpathy();
+      });
+    });
+    document.getElementById('em-add-btn').addEventListener('click', () => {
+      const inp = document.getElementById('em-note-input');
+      const quad = document.getElementById('em-quad-sel').value;
+      const val = inp.value.trim();
+      if (!val) return;
+      empathyStore[activeEmRole].notes[quad].push(val);
+      inp.value = '';
+      renderEmpathy();
+    });
+    renderEmpathy();
+
+    // Slide 06: Problem Statement Presets
+    const psPresets = {
+      wali: ['Orang tua / wali santri', 'ringkasan saldo & batas belanja harian yang jelas', 'mereka ingin memastikan uang saku anak cukup tanpa harus bertanya berulang kali'],
+      kasir: ['Kasir kantin pondok', 'alur pencarian santri dan validasi saldo yang cepat', 'antrean jam istirahat sangat padat dan kesalahan nominal harus dihindari'],
+      admin: ['Admin keuangan pondok', 'ledger transaksi dan jejak persetujuan yang terpusat', 'akuntabilitas dana santri dan pencairan kantin harus dapat ditelusuri kapan saja']
+    };
+    document.querySelectorAll('[data-pspreset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-pspreset]').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const [u, n, i] = psPresets[btn.dataset.pspreset];
+        document.getElementById('ps-user').value = u;
+        document.getElementById('ps-need').value = n;
+        document.getElementById('ps-insight').value = i;
+      });
+    });
+
+    // Slide 07: HMW Switcher
+    const hmwData = {
+      wali: {
+        q: 'Bagaimana kita dapat membantu wali memahami penggunaan saldo anak dengan jelas, tanpa mengurangi kemandirian santri?',
+        s: 'Pertanyaan ini cukup spesifik pada kebutuhan pengguna, sekaligus cukup terbuka untuk melahirkan banyak alternatif solusi.'
+      },
+      kasir: {
+        q: 'Bagaimana kita dapat membantu kasir kantin menyelesaikan transaksi dengan cepat dan akurat di tengah antrean jam istirahat?',
+        s: 'Berfokus pada kecepatan identifikasi santri, kejelasan batas limit, dan pencegahan salah input.'
+      },
+      admin: {
+        q: 'Bagaimana kita dapat membantu admin pondok memantau arus kas dan persetujuan pencairan kantin secara transparan dan mudah diaudit?',
+        s: 'Menjaga keseimbangan antara kontrol finansial yang ketat dan kemudahan operasional harian.'
+      }
+    };
+    document.querySelectorAll('[data-hmw]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-hmw]').forEach(b => {
+          b.classList.remove('active');
+          b.style.background = 'transparent';
+          b.style.color = '#fff';
+        });
+        btn.classList.add('active');
+        btn.style.background = '#c8f560';
+        btn.style.color = '#0b362c';
+        const item = hmwData[btn.dataset.hmw];
+        document.getElementById('hmw-main-q').textContent = item.q;
+        document.getElementById('hmw-sub').textContent = item.s;
+      });
+    });
+
+    // Slide 08: SCAMPER Explorer
+    const scamperDetails = [
+      { t: 'S — Substitute (Mengganti)', d: 'Mengganti uang tunai dan buku catatan kertas di kantin dengan kartu RFID santri yang langsung memotong saldo digital.' },
+      { t: 'C — Combine (Menggabungkan)', d: 'Menggabungkan informasi saldo tersedia, pemakaian limit harian, dan tombol top-up dalam satu kartu ringkasan wali.' },
+      { t: 'A — Adapt (Mengadaptasi)', d: 'Mengadaptasi pola notifikasi ringkas ala dompet digital modern ke dalam pesan WhatsApp bagi orang tua.' },
+      { t: 'M — Modify (Memodifikasi)', d: 'Memodifikasi tampilan riwayat transaksi dengan pengelompokan per hari dan label kantin agar mudah dipindai.' },
+      { t: 'P — Put to Another Use (Manfaat Lain)', d: 'Memanfaatkan data riwayat belanja untuk membantu wali berdiskusi soal literasi keuangan bersama santri saat liburan.' },
+      { t: 'E — Eliminate (Menghilangkan)', d: 'Menghilangkan langkah input ulang nominal transfer manual dengan verifikasi status pembayaran top-up otomatis.' },
+      { t: 'R — Reverse (Membalikkan)', d: 'Membalik pola dari "wali bertanya sisa uang ke pengurus" menjadi "sistem memberi ringkasan proaktif sesuai batas yang diatur wali".' }
+    ];
+    document.querySelectorAll('[data-sc]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-sc]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const item = scamperDetails[Number(btn.dataset.sc)];
+        document.getElementById('sc-title').textContent = item.t;
+        document.getElementById('sc-desc').textContent = item.d;
+      });
+    });
+
+    // Slide 09: 12 Idea Bank + Voting & Adding
+    const ideasList = [
+      { cat: '01 · VISIBILITAS', text: 'Ringkasan saldo dan belanja hari ini', votes: 4 },
+      { cat: '02 · KONTROL', text: 'Atur limit harian per anak', votes: 5 },
+      { cat: '03 · TOP-UP', text: 'Isi saldo lewat QRIS', votes: 3 },
+      { cat: '04 · NOTIFIKASI', text: 'Info transaksi untuk wali yang memilih ikut', votes: 3 },
+      { cat: '05 · RIWAYAT', text: 'Filter transaksi menurut tanggal dan kantin', votes: 2 },
+      { cat: '06 · KASIR', text: 'Pencarian santri dengan RFID / identitas', votes: 4 },
+      { cat: '07 · KANTIN', text: 'Katalog produk dan stok yang transparan', votes: 2 },
+      { cat: '08 · KEAMANAN', text: 'Persetujuan ganda untuk transaksi besar', votes: 3 },
+      { cat: '09 · ADMIN', text: 'Laporan yang mudah diekspor dan diperiksa', votes: 2 },
+      { cat: '10 · AKSES', text: 'Kontrol peran untuk tiap jenis pengguna', votes: 3 },
+      { cat: '11 · PENGINGAT', text: 'Notifikasi saldo rendah yang dapat diatur', votes: 4 },
+      { cat: '12 · BANTUAN', text: 'Penjelasan status dan langkah berikutnya', votes: 2 }
+    ];
+    const ideaGrid = document.getElementById('idea-bank-grid');
+    function renderIdeas() {
+      ideaGrid.innerHTML = '';
+      ideasList.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'sticky-note';
+        div.innerHTML = `
+          <div>
+            <span class="tiny-label" style="color:#5a6b62;display:block;margin-bottom:5px;">${item.cat}</span>
+            <strong style="font-size:12.5px;line-height:1.4;display:block;">${item.text}</strong>
+          </div>
+          <button type="button" class="vote-btn ${item.voted ? 'voted' : ''}">★ ${item.votes}</button>
+        `;
+        div.querySelector('.vote-btn').addEventListener('click', () => {
+          item.voted = !item.voted;
+          item.votes += item.voted ? 1 : -1;
+          renderIdeas();
+        });
+        ideaGrid.appendChild(div);
+      });
+    }
+    document.getElementById('add-idea-btn').addEventListener('click', () => {
+      const inp = document.getElementById('new-idea-input');
+      const val = inp.value.trim();
+      if (!val) return;
+      const num = String(ideasList.length + 1).padStart(2, '0');
+      ideasList.push({ cat: `${num} · IDE BARU`, text: val, votes: 1, voted: true });
+      inp.value = '';
+      renderIdeas();
+    });
+    renderIdeas();
+
+    // Slide 10: Matrix Chip Inspector
+    document.querySelectorAll('[data-mx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-mx]').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const [t, d, h] = btn.dataset.mx.split('|');
+        document.getElementById('mx-title').textContent = t;
+        document.getElementById('mx-desc').textContent = d;
+        document.getElementById('mx-hyp').innerHTML = `<strong>${h.split(':')[0]}:</strong>${h.split(':').slice(1).join(':')}`;
+      });
+    });
+
+    // Slide 11: Prototype Fidelity Levels
+    const fidLevels = [
+      { t: '1 · Sketsa Kertas (Low-Fidelity)', d: 'Coretan cepat tata letak kartu saldo dan tombol aksi dalam 5 menit untuk menguji urutan informasi paling penting.' },
+      { t: '2 · Wireframe Struktur', d: 'Kerangka hitam-putih tanpa warna dekoratif agar penguji fokus pada kejelasan label, hierarki angka, dan navigasi.' },
+      { t: '3 · Mockup Interaktif (Mid/High-Fidelity)', d: 'Tampilan visual mendekati produk nyata (seperti konsep Bu Aisyah di slide berikutnya) untuk menguji tugas spesifik.' },
+      { t: '4 · Role Play Simulasi Kantin', d: 'Bermain peran antara kasir dan santri di meja kantin untuk menguji kecepatan alur transaksi dan pengecekan limit.' },
+      { t: '5 · Storyboard Perjalanan', d: 'Rangkaian adegan dari orang tua melakukan top-up di rumah hingga santri bertransaksi di kantin pondok.' }
+    ];
+    document.querySelectorAll('[data-fid]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-fid]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const item = fidLevels[Number(btn.dataset.fid)];
+        document.getElementById('fid-title').textContent = item.t;
+        document.getElementById('fid-desc').textContent = item.d;
+      });
+    });
+
+    // Slide 12: Live Interactive Prototype Phone
+    let prBal = 245000;
+    let prSpend = 18000;
+    let prLimit = 50000;
+    function syncProtoPhone() {
+      document.getElementById('pr-bal').textContent = 'Rp ' + prBal.toLocaleString('id-ID');
+      document.getElementById('pr-spend').textContent = `Rp ${prSpend.toLocaleString('id-ID')} / Rp ${prLimit.toLocaleString('id-ID')}`;
+      const pct = Math.min(100, Math.round((prSpend / prLimit) * 100));
+      const bar = document.getElementById('pr-bar');
+      bar.style.width = pct + '%';
+      bar.style.background = pct >= 90 ? '#fb7185' : pct >= 70 ? '#fbbf24' : '#c8f560';
+    }
+    document.getElementById('pr-btn-topup').addEventListener('click', () => {
+      prBal += 50000;
+      syncProtoPhone();
+      const row = document.createElement('div');
+      row.className = 'tx-item';
+      row.innerHTML = `<div><b>Top-up saldo</b><span>Baru saja · Simulasi</span></div><strong style="color:#155a47;">+ Rp 50.000</strong>`;
+      document.getElementById('pr-tx-list').prepend(row);
+    });
+    document.getElementById('pr-btn-limit').addEventListener('click', () => {
+      const dr = document.getElementById('pr-limit-drawer');
+      dr.style.display = dr.style.display === 'none' ? 'block' : 'none';
+    });
+    document.getElementById('pr-lim-slider').addEventListener('input', e => {
+      prLimit = Number(e.target.value);
+      document.getElementById('pr-lim-val').textContent = 'Rp ' + prLimit.toLocaleString('id-ID');
+      syncProtoPhone();
+    });
+    document.getElementById('pr-sim-buy').addEventListener('click', () => {
+      if (prSpend + 10000 > prLimit) {
+        const row = document.createElement('div');
+        row.className = 'tx-item';
+        row.innerHTML = `<div><b style="color:#b91c1c;">Ditolak: Melebihi Limit</b><span>Batas Rp ${prLimit.toLocaleString('id-ID')}</span></div><strong style="color:#b91c1c;">✕</strong>`;
+        document.getElementById('pr-tx-list').prepend(row);
+        return;
+      }
+      prBal -= 10000;
+      prSpend += 10000;
+      syncProtoPhone();
+      const row = document.createElement('div');
+      row.className = 'tx-item';
+      row.innerHTML = `<div><b>Jajan Kantin</b><span>Baru saja · Simulasi</span></div><strong>− Rp 10.000</strong>`;
+      document.getElementById('pr-tx-list').prepend(row);
+    });
+
+    // Slide 13: Task Observation Status Cycler
+    const taskStates = ['Status: Belum diuji', '✓ Berhasil Mudah', '⚠ Perlu Waktu', '✕ Bingung'];
+    document.querySelectorAll('.task-status-btn').forEach(btn => {
+      let s = 0;
+      btn.addEventListener('click', () => {
+        s = (s + 1) % taskStates.length;
+        btn.textContent = taskStates[s];
+        btn.classList.toggle('active', s === 1);
+      });
+    });
+
+    // Overview Modal & Controls
+    const ovModal = document.getElementById('overview-modal');
+    function toggleOverview(open) {
+      const target = typeof open === 'boolean' ? open : !ovModal.classList.contains('open');
+      ovModal.classList.toggle('open', target);
+      ovModal.setAttribute('aria-hidden', String(!target));
+    }
+    document.getElementById('open-overview').addEventListener('click', () => toggleOverview(true));
+    document.getElementById('close-overview').addEventListener('click', () => toggleOverview(false));
+    ovModal.addEventListener('click', e => { if (e.target === ovModal) toggleOverview(false); });
+
+    document.getElementById('btn-print').addEventListener('click', () => window.print());
+    document.getElementById('btn-full').addEventListener('click', () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+        if (e.key === 'Escape') document.activeElement.blur();
+        return;
+      }
+      if (ovModal.classList.contains('open')) {
+        if (e.key === 'Escape') toggleOverview(false);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); toggleOverview(); return; }
+      if (e.key.toLowerCase() === 'o') { toggleOverview(); return; }
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goSlide(current + 1); }
+      if (e.key === 'ArrowLeft') goSlide(current - 1);
+      if (e.key === 'Home') goSlide(0);
+      if (e.key === 'End') goSlide(slides.length - 1);
+    });
+
+    let touchX = 0;
+    document.addEventListener('touchstart', e => { touchX = e.changedTouches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const dx = touchX - e.changedTouches[0].clientX;
+      if (Math.abs(dx) > 60 && !ovModal.classList.contains('open')) {
+        goSlide(current + (dx > 0 ? 1 : -1));
+      }
+    }, { passive: true });
+
+    const initial = location.hash.match(/^#slide-(\d+)$/);
+    goSlide(initial ? Number(initial[1]) - 1 : 0);
+  </script>
+</body>
+</html>

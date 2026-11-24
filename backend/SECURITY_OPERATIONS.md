@@ -27,6 +27,25 @@ This API handles real balances. Do not expose it to the public internet until th
 - Admin and cashier accounts cannot use the API until TOTP MFA is enrolled. The login response contains a short-lived `challenge_token`; use it with `POST /api/auth/mfa/setup`, register the returned secret/URI in an authenticator, and submit the six-digit code to `POST /api/auth/mfa/verify`. Show the enrollment secret only over HTTPS and do not log or persist it in a client.
 - Access tokens last one hour. Successful MFA login increments `token_version`; changing a password, role, or active status also increments it. Disabled accounts are denied immediately. MFA codes are accepted only once per time step.
 
+## Portfolio administrator
+
+- The public portfolio is available at `/portfolio`; editing is isolated at `/portfolio/admin` and uses a separate password from PondokPay user accounts.
+- Before the first setup, generate an independent one-time `PORTFOLIO_SETUP_TOKEN` with at least 32 cryptographically random bytes. Put it in the backend environment, run the database migration, and restart the API. Do not put this token in frontend configuration or source control. The setup page accepts it once together with the password you choose; the token is not stored in the database, and the unique administrator row prevents a second setup.
+- A PowerShell option for generating a token without adding it to shell history is:
+
+  ```powershell
+  $bytes = New-Object byte[] 32
+  [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+  $setupToken = [Convert]::ToBase64String($bytes)
+  [Array]::Clear($bytes, 0, $bytes.Length)
+  $setupToken
+  ```
+
+- After setup, remove `PORTFOLIO_SETUP_TOKEN` from the backend environment and restart the API. Use a unique password of at least 12 bytes and no more than bcrypt's 72-byte limit. The password is bcrypt-hashed in the database; it is never stored in the portfolio content.
+- Portfolio access tokens are signed using `JWT_SECRET`, limited to the `portfolio-admin` audience, kept only in the open admin page's memory, and expire after 30 minutes. Logging out or changing the password revokes existing sessions. Login attempts use the database-backed login rate limiter.
+- Run `npm run migrate` with the migration database account before deploying the schema changes. The runtime account needs `SELECT`, `INSERT`, and `UPDATE` on `portfolio_admin` and `portfolio_content`; do not grant it `DELETE` on either table.
+- Public visitors can read only the published portfolio profile. Every write and password operation is checked server-side; protecting the React route alone is not an access-control boundary.
+
 ## Production configuration and database permissions
 
 Set `NODE_ENV=production`, strong independent keys, `DB_AUTO_MIGRATE=false`, `DB_SSL_CA` to the trusted database CA certificate, and `TRUST_PROXY_HOPS` to the exact number of trusted TLS-terminating proxies. The API rejects plain HTTP in production. Configure the reverse proxy to redirect HTTP to HTTPS, forward `X-Forwarded-Proto`, and enforce its own distributed rate limit. The in-process general API limiter is per instance; login/MFA limits are database-backed and shared across instances.

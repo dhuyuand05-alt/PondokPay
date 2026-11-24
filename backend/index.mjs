@@ -9,6 +9,7 @@ import adminRoutes from './Routes/adminRoutes.js';
 import canteenRoutes from './Routes/canteenRoutes.js';
 import parentRoutes from './Routes/parentRoutes.js';
 import settingsRoutes from './Routes/settingsRoutes.js';
+import portfolioRoutes from './Routes/portfolioRoutes.js';
 import { handleMidtransNotification } from './Controllers/midtransController.js';
 import pool, { ensureAdminSchema } from './config/db.js';
 import { startWhatsAppNotificationWorker } from './services/whatsappNotifications.js';
@@ -73,6 +74,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/portfolio', portfolioRoutes);
 app.post('/api/midtrans/notification', handleMidtransNotification);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);

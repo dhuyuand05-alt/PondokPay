@@ -5,6 +5,7 @@ import { ensureLedgerSchema } from './dbSchema/ledger.js';
 import { ensureServiceFeeSchema } from './dbSchema/serviceFees.js';
 import { ensureAdminCashSchema } from './dbSchema/adminCash.js';
 import { ensurePaymentAndIndexesSchema } from './dbSchema/paymentAndIndexes.js';
+import { ensurePortfolioSchema } from './dbSchema/portfolio.js';
 
 export const ensureAdminSchema = async () => {
   await ensureBaseSchema(pool);
@@ -13,6 +14,7 @@ export const ensureAdminSchema = async () => {
   await ensureServiceFeeSchema(pool);
   await ensureAdminCashSchema(pool);
   await ensurePaymentAndIndexesSchema(pool);
+  await ensurePortfolioSchema(pool);
 };
 
 export default pool;
