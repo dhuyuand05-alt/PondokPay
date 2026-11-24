@@ -18,6 +18,11 @@ import {
   getCanteenPayoutApprovalsForAdmin,
   requestCanteenPayoutApproval,
 } from '../../services/canteenPayoutApprovals.js';
+import {
+  getCanteenSalesReport,
+  getCanteenShiftHistory,
+} from '../../Controllers/canteenOperationsController.js';
+import { getCanteenProducts } from '../../Controllers/canteenCatalogController.js';
 
 const router = express.Router();
 
@@ -28,6 +33,7 @@ router.put('/kantin/:id', updateKantin);
 router.patch('/kantin/:id', updateKantin);
 router.delete('/kantin/:id', deleteKantin);
 router.get('/kantin/:id/kasir', getCanteenCashiers);
+router.get('/kantin/:id/produk', getCanteenProducts);
 router.post('/kantin/:id/kasir', assignCanteenCashier);
 router.delete('/kantin/:id/kasir/:userId', removeCanteenCashier);
 router.post('/kantin/:id/penjualan', createCanteenSale);
@@ -35,5 +41,7 @@ router.get('/kantin/:id/pencairan/persetujuan-kasir', getCanteenPayoutApprovalsF
 router.post('/kantin/:id/pencairan/persetujuan-kasir', requestCanteenPayoutApproval);
 router.post('/kantin/:id/pencairan', createCanteenWithdrawal);
 router.get('/kantin/:id/transaksi', getCanteenTransactions);
+router.get('/kantin/:id/laporan', getCanteenSalesReport);
+router.get('/kantin/:id/giliran', getCanteenShiftHistory);
 
 export default router;

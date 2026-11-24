@@ -200,6 +200,7 @@ CREATE TABLE IF NOT EXISTS canteen_products (
     sku VARCHAR(40) DEFAULT NULL,
     barcode VARCHAR(80) DEFAULT NULL,
     harga DECIMAL(10,2) NOT NULL,
+    average_unit_cost DECIMAL(10,2) DEFAULT NULL,
     stok INT UNSIGNED NOT NULL DEFAULT 0,
     stok_minimum INT UNSIGNED NOT NULL DEFAULT 5,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -219,6 +220,8 @@ CREATE TABLE IF NOT EXISTS canteen_sale_items (
     nama_produk VARCHAR(120) NOT NULL,
     sku VARCHAR(40) DEFAULT NULL,
     harga_satuan DECIMAL(10,2) NOT NULL,
+    harga_pokok_satuan DECIMAL(10,2) DEFAULT NULL,
+    total_harga_pokok DECIMAL(14,2) DEFAULT NULL,
     quantity INT UNSIGNED NOT NULL,
     subtotal DECIMAL(12,2) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -233,9 +236,10 @@ CREATE TABLE IF NOT EXISTS canteen_sale_items (
 CREATE TABLE IF NOT EXISTS canteen_stock_movements (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
+    purchase_id BIGINT DEFAULT NULL,
     transaksi_id BIGINT DEFAULT NULL,
     user_id INT DEFAULT NULL,
-    movement_type ENUM('adjustment', 'sale') NOT NULL,
+    movement_type ENUM('adjustment', 'sale', 'receipt', 'refund') NOT NULL,
     quantity_change INT NOT NULL,
     stock_after INT UNSIGNED NOT NULL,
     note VARCHAR(255) DEFAULT NULL,
@@ -249,6 +253,95 @@ CREATE TABLE IF NOT EXISTS canteen_stock_movements (
     CONSTRAINT fk_canteen_stock_user FOREIGN KEY (user_id)
         REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS canteen_suppliers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    kantin_id INT NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    contact_name VARCHAR(120) DEFAULT NULL,
+    phone VARCHAR(40) DEFAULT NULL,
+    email VARCHAR(190) DEFAULT NULL,
+    address VARCHAR(255) DEFAULT NULL,
+    notes VARCHAR(255) DEFAULT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by INT DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_canteen_suppliers_active (kantin_id, is_active, name),
+    CONSTRAINT fk_canteen_supplier_kantin FOREIGN KEY (kantin_id)
+        REFERENCES kantin(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_supplier_creator FOREIGN KEY (created_by)
+        REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS canteen_purchase_receipts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    kantin_id INT NOT NULL,
+    supplier_id INT NOT NULL,
+    supplier_name VARCHAR(120) DEFAULT NULL,
+    invoice_number VARCHAR(80) NOT NULL,
+    invoice_date DATE DEFAULT NULL,
+    due_date DATE DEFAULT NULL,
+    total_amount DECIMAL(12,2) NOT NULL,
+    note VARCHAR(255) DEFAULT NULL,
+    idempotency_key VARCHAR(64) NOT NULL,
+    request_hash CHAR(64) NOT NULL,
+    received_by INT DEFAULT NULL,
+    received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_canteen_purchase_invoice (kantin_id, supplier_id, invoice_number),
+    UNIQUE KEY uq_canteen_purchase_idempotency (kantin_id, idempotency_key),
+    INDEX idx_canteen_purchase_received (kantin_id, received_at),
+    INDEX idx_canteen_purchase_supplier (supplier_id, received_at),
+    CONSTRAINT fk_canteen_purchase_kantin FOREIGN KEY (kantin_id)
+        REFERENCES kantin(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_purchase_supplier FOREIGN KEY (supplier_id)
+        REFERENCES canteen_suppliers(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_purchase_receiver FOREIGN KEY (received_by)
+        REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS canteen_purchase_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    purchase_id BIGINT NOT NULL,
+    product_id INT NOT NULL,
+    product_name VARCHAR(120) NOT NULL,
+    quantity INT UNSIGNED NOT NULL,
+    unit_cost DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(12,2) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_canteen_purchase_items_purchase (purchase_id),
+    INDEX idx_canteen_purchase_items_product (product_id),
+    CONSTRAINT fk_canteen_purchase_item_receipt FOREIGN KEY (purchase_id)
+        REFERENCES canteen_purchase_receipts(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_purchase_item_product FOREIGN KEY (product_id)
+        REFERENCES canteen_products(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS canteen_supplier_payments (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    kantin_id INT NOT NULL,
+    purchase_id BIGINT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    method ENUM('cash', 'bank_transfer', 'other') NOT NULL,
+    reference_code VARCHAR(100) DEFAULT NULL,
+    note VARCHAR(255) DEFAULT NULL,
+    idempotency_key VARCHAR(64) NOT NULL,
+    request_hash CHAR(64) NOT NULL,
+    paid_by INT DEFAULT NULL,
+    paid_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_canteen_supplier_payment_idempotency (kantin_id, idempotency_key),
+    INDEX idx_canteen_supplier_payment_purchase (purchase_id, paid_at),
+    CONSTRAINT fk_canteen_supplier_payment_kantin FOREIGN KEY (kantin_id)
+        REFERENCES kantin(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_supplier_payment_purchase FOREIGN KEY (purchase_id)
+        REFERENCES canteen_purchase_receipts(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_canteen_supplier_payment_cashier FOREIGN KEY (paid_by)
+        REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+ALTER TABLE canteen_stock_movements
+    ADD CONSTRAINT fk_canteen_stock_purchase FOREIGN KEY (purchase_id)
+    REFERENCES canteen_purchase_receipts(id) ON DELETE RESTRICT;
 
 CREATE TABLE IF NOT EXISTS service_fee_rates (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

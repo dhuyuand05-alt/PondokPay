@@ -143,7 +143,7 @@ export const getCanteenTransactions = async (req, res) => {
   const conditions = ['kt.kantin_id = ?'];
   const values = [kantinId];
   if (req.query.tipe_transaksi !== undefined) {
-    if (!['penjualan', 'pencairan'].includes(req.query.tipe_transaksi)) {
+    if (!['penjualan', 'pencairan', 'refund'].includes(req.query.tipe_transaksi)) {
       return res.status(400).json({ message: 'Jenis transaksi kantin tidak valid.' });
     }
     conditions.push('kt.tipe_transaksi = ?');
@@ -158,9 +158,15 @@ export const getCanteenTransactions = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT kt.id, kt.kantin_id, kt.transaksi_id, kt.tipe_transaksi,
               kt.jumlah, kt.saldo_akhir, kt.keterangan, kt.created_at,
-              t.santri_id, s.nis, s.nama_lengkap
+              t.santri_id, s.nis, s.nama_lengkap,
+              ref.original_transaksi_id AS refunded_sale_id,
+              ref.reason AS refund_reason, ref.restocked,
+              sale_ref.id AS refund_id
        FROM kantin_transaksi kt
        LEFT JOIN transaksi t ON t.id = kt.transaksi_id
+       LEFT JOIN canteen_sale_refunds ref ON ref.refund_transaksi_id = kt.transaksi_id
+       LEFT JOIN canteen_sale_refunds sale_ref
+         ON sale_ref.original_transaksi_id = COALESCE(ref.original_transaksi_id, kt.transaksi_id)
        LEFT JOIN santri s ON s.id = t.santri_id
        ${where}
        ORDER BY kt.created_at DESC, kt.id DESC LIMIT ? OFFSET ?`,

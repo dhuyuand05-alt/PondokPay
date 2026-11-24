@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowDownLeft,
@@ -42,10 +42,12 @@ import {
 import { CashierAccount, CashierCatalogManagement, CashierHome, CashierHistory, CashierPayoutApprovals } from './components/cashier/index.js';
 import { ParentAccount, ParentHome, ParentHistory, ParentLimit, ParentTopup } from './components/parent/index.js';
 import DocumentationPage from './DocumentationPage.jsx';
-import PortfolioApp from './Portfolio.jsx';
+const PortfolioApp = lazy(() => import('./Portfolio.jsx'));
 
 const TOKEN_KEY = 'pondokpay.access_token';
 const USER_KEY = 'pondokpay.user';
+const CashierPurchasing = lazy(() => import('./components/cashier/Purchasing.jsx')
+  .then((module) => ({ default: module.CashierPurchasing })));
 
 function Login({ onLogin, institutionError }) {
   const [username, setUsername] = useState('');
@@ -426,6 +428,7 @@ function SessionRoutes({ session, onLogout, onInstitutionUpdate }) {
         <Route path="/kasir" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierHome token={token} /></MobileLayout>} />
         <Route path="/kasir/history" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierHistory token={token} /></MobileLayout>} />
         <Route path="/kasir/catalog" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierCatalogManagement token={token} /></MobileLayout>} />
+        <Route path="/kasir/purchasing" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><Suspense fallback={<Loading />}><CashierPurchasing token={token} /></Suspense></MobileLayout>} />
         <Route path="/kasir/payout-approvals" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierPayoutApprovals token={token} /></MobileLayout>} />
         <Route path="/kasir/account" element={<MobileLayout user={user} basePath="/kasir" token={token} onLogout={onLogout}><CashierAccount token={token} user={user} onLogout={onLogout} /></MobileLayout>} />
         <Route path="*" element={<Navigate to="/kasir" replace />} />
@@ -545,7 +548,11 @@ export default function App() {
   };
 
   if (location.pathname === '/portfolio' || location.pathname.startsWith('/portfolio/')) {
-    return <PortfolioApp admin={location.pathname === '/portfolio/admin'} />;
+    return (
+      <Suspense fallback={<Loading label="Memuat portofolio..." />}>
+        <PortfolioApp admin={location.pathname === '/portfolio/admin'} />
+      </Suspense>
+    );
   }
   if (checking) return <InstitutionContext.Provider value={institution}><Loading label="Memeriksa sesi..." /></InstitutionContext.Provider>;
   if (challenge) return <InstitutionContext.Provider value={institution}><Mfa challenge={challenge} onComplete={completeLogin} onBack={() => setChallenge(null)} /></InstitutionContext.Provider>;

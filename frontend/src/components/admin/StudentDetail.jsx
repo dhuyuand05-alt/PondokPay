@@ -301,7 +301,7 @@ export function AdminStudentDetail({ token }) {
                     </p>
                   </div>
                   <p className="font-semibold">
-                    {item.tipe_transaksi === 'topup' ? '+' : '−'}
+                    {['topup', 'refund_belanja'].includes(item.tipe_transaksi) ? '+' : '−'}
                     {formatMoney(item.jumlah)}
                   </p>
                 </div>

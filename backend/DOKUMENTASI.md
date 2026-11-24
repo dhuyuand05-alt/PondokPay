@@ -26,7 +26,7 @@ Nilai saldo menggunakan `DECIMAL` dan umumnya dikirim sebagai string desimal, mi
 
 Dependency utama adalah Express, `mysql2`, `jsonwebtoken`, `bcryptjs`, `dotenv`, `multer` untuk unggahan logo, Baileys dan `qrcode` untuk koneksi WhatsApp berbasis QR, serta PDFKit untuk laporan finansial. Midtrans Snap menggunakan HTTPS API bawaan Node.js tanpa menyimpan Server Key di frontend. Versi dependency terkunci di `package-lock.json`.
 
-Untuk instalasi database kosong, gunakan [`sql/install.sql`](./sql/install.sql) dari direktori `backend`; skrip tersebut memasang semua tabel dan trigger yang dipakai aplikasi melalui `users.sql` dan `admin_api.sql`. Langkah deployment VPS lengkap terdapat di [PANDUAN_DEPLOYMENT_VPS.md](../PANDUAN_DEPLOYMENT_VPS.md).
+Untuk instalasi database kosong, gunakan [`sql/install.sql`](./sql/install.sql) dari direktori `backend`. Skrip ini mandiri dan mencakup seluruh tabel, indeks, foreign key, serta trigger yang dipakai aplikasi; tidak memerlukan file SQL lain melalui `SOURCE`. Langkah deployment VPS lengkap terdapat di [PANDUAN_DEPLOYMENT_VPS.md](../PANDUAN_DEPLOYMENT_VPS.md).
 
 ## 3. Instalasi dan menjalankan secara lokal
 
@@ -61,6 +61,7 @@ Gunakan `backend/.env.example` sebagai daftar variabel yang tersedia. Simpan nil
 | Variabel | Kegunaan |
 |---|---|
 | `PORT` | Port HTTP API; default `3000` |
+| `HOST` | Alamat bind API; default `0.0.0.0`. Pada produksi dengan reverse proxy satu host, gunakan `127.0.0.1` agar port API tidak terbuka langsung ke jaringan |
 | `NODE_ENV` | Mode aplikasi; gunakan `production` saat deployment produksi |
 | `JWT_SECRET` | Kunci token; wajib sekurangnya 32 byte acak |
 | `MFA_ENCRYPTION_KEY` | Kunci AES-256 untuk secret MFA; 64 karakter hex |
@@ -119,7 +120,7 @@ Integrasi notifikasi wali menggunakan Baileys: admin menghubungkan perangkat dar
 
 Baileys adalah library tidak resmi untuk protokol WhatsApp Web, bukan layanan WhatsApp resmi. Koneksi dapat terputus dan akun dapat dibatasi; gunakan nomor khusus bot, patuhi ketentuan WhatsApp, dan kirim hanya notifikasi yang disetujui wali. Data sesi adalah kredensial sensitif; perlakukan sebagai rahasia dan jangan salin ke lingkungan lain.
 
-Migrasi skema mengosongkan token Fonnte lama jika masih tersimpan, menyiapkan kolom kredensial Midtrans dan tabel pesanan QRIS, menambahkan nama aplikasi PWA, serta menambahkan pengaturan katalog dan tabel produk, rincian penjualan, serta pergerakan stok. Untuk instalasi produksi, jalankan `npm run migrate` dengan kredensial migrasi sebelum menjalankan versi backend ini.
+Migrasi skema mengosongkan token Fonnte lama jika masih tersimpan, menyiapkan kolom kredensial Midtrans dan tabel pesanan QRIS, menambahkan nama aplikasi PWA, serta menyiapkan skema POS kantin termasuk snapshot HPP, pemasok, faktur penerimaan stok, utang, dan pembayaran eksternal. Pembayaran pemasok tidak mengubah saldo/ledger kantin. Untuk instalasi produksi, backup database terlebih dahulu, lalu jalankan `npm run migrate` dengan kredensial migrasi sebelum menjalankan versi backend ini. Migrasi produksi tidak dijalankan otomatis oleh startup.
 
 ## 6. Migrasi dan provisioning admin
 
@@ -136,7 +137,7 @@ Untuk database kosong yang baru dibuat, jalankan installer SQL terlebih dahulu d
 mysql -u root -p < sql/install.sql
 ```
 
-Installer membuat database `db_cashless_santri`, seluruh tabel operasional, indeks, foreign key, dan trigger append-only. Script migrasi Node menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian memastikan/memperbarui skema termasuk menambahkan kolom idempotensi yang belum ada pada ledger kas lama. Pada produksi, jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
+Installer membuat database `db_cashless_santri`, seluruh tabel operasional, indeks, foreign key, dan trigger append-only. Script migrasi Node menggunakan `MIGRATION_DB_USER` dan `MIGRATION_DB_PASSWORD` jika dikonfigurasi, kemudian memastikan/memperbarui skema termasuk menambahkan kolom idempotensi yang belum ada pada ledger kas lama serta tabel POS, pembelian, dan pembayaran pemasok. Pada produksi, backup database dan jalankan migrasi terpisah sebelum deploy aplikasi. Akun migrasi membutuhkan hak skema dan tidak boleh menjadi kredensial proses API.
 
 Provision admin awal sesudah migrasi:
 

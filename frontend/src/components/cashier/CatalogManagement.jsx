@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock3, Package, Pencil, Plus, Search } from 'lucide-react';
+import { Clock3, Package, PackagePlus, Pencil, Plus, Search } from 'lucide-react';
 import { api } from '../../api.js';
 import { useApiData } from '../../hooks.js';
 import {
@@ -33,6 +33,9 @@ export function CashierCatalogManagement({ token }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modal, setModal] = useState(false);
+  const [stockModal, setStockModal] = useState(false);
+  const [stockProduct, setStockProduct] = useState(null);
+  const [stockForm, setStockForm] = useState({ movement_type: 'receipt', quantity_change: '', note: '' });
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
@@ -73,6 +76,35 @@ export function CashierCatalogManagement({ token }) {
     );
   });
 
+  const openStockForm = (product) => {
+    setStockProduct(product);
+    setStockForm({ movement_type: 'receipt', quantity_change: '', note: '' });
+    setErrorMessage('');
+    setStockModal(true);
+  };
+
+  const saveStockChange = async (event) => {
+    event.preventDefault();
+    if (!stockProduct) return;
+    setBusy(true);
+    setErrorMessage('');
+    try {
+      await api.post(`/kantin/${id}/produk/${stockProduct.id}/stok`, {
+        ...stockForm,
+        quantity_change: Number(stockForm.quantity_change),
+      }, token);
+      setStockModal(false);
+      setStockProduct(null);
+      setNotice('Perubahan stok berhasil dicatat.');
+      refreshProducts();
+      refreshMovements();
+    } catch (err) {
+      setErrorMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openForm = (product = null) => {
     setEditing(product);
     setForm(product ? {
@@ -95,10 +127,10 @@ export function CashierCatalogManagement({ token }) {
     setErrorMessage('');
     setNotice('');
     try {
+      const { stok, ...productFields } = form;
       const payload = {
-        ...form,
+        ...productFields,
         harga: Number(form.harga),
-        stok: Number(form.stok),
         stok_minimum: Number(form.stok_minimum),
         sku: form.sku.trim() || null,
         barcode: form.barcode.trim() || null,
@@ -107,6 +139,7 @@ export function CashierCatalogManagement({ token }) {
         await api.patch(`/kantin/${id}/produk/${editing.id}`, payload, token);
         setNotice('Produk berhasil diperbarui.');
       } else {
+        payload.stok = Number(stok);
         await api.post(`/kantin/${id}/produk`, payload, token);
         setNotice('Produk berhasil ditambahkan.');
       }
@@ -210,6 +243,23 @@ export function CashierCatalogManagement({ token }) {
               <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${canteen.catalog_enabled ? 'left-7' : 'left-1'}`} />
             </button>
           </section>
+          <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {[
+              ['Produk aktif', products.filter(isActiveProduct).length, Package, 'bg-pondok-50 text-pondok-700'],
+              ['Stok menipis', products.filter((item) => isActiveProduct(item) && Number(item.stok) <= Number(item.stok_minimum)).length, Clock3, 'bg-amber-50 text-amber-700'],
+              ['Mode katalog', canteen.catalog_enabled ? 'Aktif' : 'Manual', PackagePlus, canteen.catalog_enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'],
+            ].map(([label, value, Icon, iconStyle]) => (
+              <article key={label} className="flex min-w-0 items-center gap-3 rounded-2xl border border-line/80 bg-white p-3 shadow-sm sm:p-3.5">
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${iconStyle}`}>
+                  <Icon size={17} />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] font-medium text-muted sm:text-[11px]">{label}</p>
+                  <p className="mt-0.5 text-sm font-semibold sm:text-base">{value}</p>
+                </div>
+              </article>
+            ))}
+          </div>
           <div className="mb-3 flex flex-col gap-2.5 sm:flex-row">
             <label className="relative flex-1">
               <Search size={16} className="absolute left-3 top-3 text-muted" />
@@ -241,11 +291,11 @@ export function CashierCatalogManagement({ token }) {
           ) : (
             <>
               <div className="hidden overflow-hidden rounded-xl border border-line bg-white lg:block">
-                <div className="grid grid-cols-[minmax(0,1fr)_105px_88px_90px_38px] bg-[#f5f5f1] px-3 py-2 text-[9px] font-semibold uppercase tracking-wide text-muted">
+                <div className="grid grid-cols-[minmax(0,1fr)_105px_88px_90px_76px] bg-[#f5f5f1] px-3 py-2 text-[9px] font-semibold uppercase tracking-wide text-muted">
                   <span>Produk / SKU</span><span>Harga</span><span>Stok</span><span>Status</span><span />
                 </div>
                 {filteredProducts.map((product) => (
-                  <div key={product.id} className="grid grid-cols-[minmax(0,1fr)_105px_88px_90px_38px] items-center border-t border-line px-3 py-2.5 text-xs hover:bg-[#f7faf7]">
+                  <div key={product.id} className="grid grid-cols-[minmax(0,1fr)_105px_88px_90px_76px] items-center border-t border-line px-3 py-2.5 text-xs hover:bg-[#f7faf7]">
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{product.nama}</p>
                       <p className="truncate text-[10px] text-muted">{product.sku || product.barcode || 'Tanpa SKU'} · {product.kategori}</p>
@@ -253,7 +303,10 @@ export function CashierCatalogManagement({ token }) {
                     <span className="font-semibold">{formatMoney(product.harga)}</span>
                     <span className={Number(product.stok) <= Number(product.stok_minimum) && isActiveProduct(product) ? 'font-semibold text-amber-700' : ''}>{product.stok} unit <small className="block text-[9px] font-normal text-muted">Min. {product.stok_minimum}</small></span>
                     <StatusBadge tone={!isActiveProduct(product) ? 'gray' : Number(product.stok) <= Number(product.stok_minimum) ? 'amber' : 'green'}>{!isActiveProduct(product) ? 'Nonaktif' : Number(product.stok) <= Number(product.stok_minimum) ? 'Menipis' : 'Aktif'}</StatusBadge>
-                    <button type="button" aria-label={`Ubah ${product.nama}`} className="grid h-8 w-8 place-items-center rounded-lg text-pondok-700 hover:bg-pondok-50" onClick={() => openForm(product)}><Pencil size={14} /></button>
+                    <div className="flex justify-end gap-1">
+                      <button type="button" aria-label={`Ubah stok ${product.nama}`} title="Catat stok masuk/penyesuaian" className="grid h-8 w-8 place-items-center rounded-lg text-pondok-700 hover:bg-pondok-50" onClick={() => openStockForm(product)}><PackagePlus size={14} /></button>
+                      <button type="button" aria-label={`Ubah ${product.nama}`} title="Ubah produk" className="grid h-8 w-8 place-items-center rounded-lg text-pondok-700 hover:bg-pondok-50" onClick={() => openForm(product)}><Pencil size={14} /></button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -267,7 +320,13 @@ export function CashierCatalogManagement({ token }) {
                           <div className="min-w-0"><p className="truncate text-xs font-semibold">{product.nama}</p><p className="truncate text-[10px] text-muted">{product.kategori} · {product.sku || product.barcode || 'Tanpa SKU'}</p></div>
                           <StatusBadge tone={!isActiveProduct(product) ? 'gray' : Number(product.stok) <= Number(product.stok_minimum) ? 'amber' : 'green'}>{!isActiveProduct(product) ? 'Nonaktif' : Number(product.stok) <= Number(product.stok_minimum) ? 'Menipis' : 'Aktif'}</StatusBadge>
                         </div>
-                        <div className="mt-2 flex items-end justify-between"><div><p className="text-sm font-semibold">{formatMoney(product.harga)}</p><p className="text-[10px] text-muted">Stok {product.stok} · Min {product.stok_minimum}</p></div><button type="button" className="grid h-8 w-8 place-items-center rounded-lg bg-[#e8f4ed] text-pondok-700" onClick={() => openForm(product)} aria-label={`Ubah ${product.nama}`}><Pencil size={14} /></button></div>
+                        <div className="mt-2 flex items-end justify-between">
+                          <div><p className="text-sm font-semibold">{formatMoney(product.harga)}</p><p className="text-[10px] text-muted">Stok {product.stok} · Min {product.stok_minimum}</p></div>
+                          <div className="flex gap-1">
+                            <button type="button" className="grid h-8 w-8 place-items-center rounded-lg bg-pondok-50 text-pondok-700" onClick={() => openStockForm(product)} aria-label={`Ubah stok ${product.nama}`}><PackagePlus size={14} /></button>
+                            <button type="button" className="grid h-8 w-8 place-items-center rounded-lg bg-[#e8f4ed] text-pondok-700" onClick={() => openForm(product)} aria-label={`Ubah ${product.nama}`}><Pencil size={14} /></button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -288,7 +347,7 @@ export function CashierCatalogManagement({ token }) {
                   <div key={movement.id} className="flex items-center gap-3 py-3 text-sm">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{movement.nama_produk}</p>
-                      <p className="text-xs text-muted">{movement.note || movement.movement_type} · {formatDate(movement.created_at, true)}</p>
+                      <p className="text-xs text-muted">{movement.note || ({ receipt: 'Stok masuk', adjustment: 'Penyesuaian', refund: 'Restok refund', sale: 'Penjualan' }[movement.movement_type] || movement.movement_type)} · {formatDate(movement.created_at, true)}</p>
                     </div>
                     <span className={Number(movement.quantity_change) < 0 ? 'font-semibold text-red-600' : 'font-semibold text-emerald-700'}>
                       {Number(movement.quantity_change) > 0 ? '+' : ''}{movement.quantity_change}
@@ -310,12 +369,48 @@ export function CashierCatalogManagement({ token }) {
               <Field label="Harga (Rp)" type="number" min="0.01" step="0.01" value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })} required />
               <Field label="SKU (opsional)" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} maxLength={40} />
               <Field label="Barcode (opsional)" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} maxLength={80} />
-              <Field label="Stok saat ini" type="number" min="0" step="1" value={form.stok} onChange={(e) => setForm({ ...form, stok: e.target.value })} required />
+              {!editing && <Field label="Stok awal" type="number" min="0" step="1" value={form.stok} onChange={(e) => setForm({ ...form, stok: e.target.value })} required />}
+              {editing && <div className="rounded-xl bg-canvas p-3 text-sm"><span className="text-muted">Stok saat ini</span><p className="mt-1 font-semibold">{editing.stok} unit</p></div>}
               <Field label="Peringatan stok rendah" type="number" min="0" step="1" value={form.stok_minimum} onChange={(e) => setForm({ ...form, stok_minimum: e.target.value })} required />
             </div>
             {errorMessage && <Alert type="error">{errorMessage}</Alert>}
             <button className="btn-primary w-full" disabled={busy}>
               {busy ? 'Menyimpan...' : editing ? 'Simpan perubahan' : 'Tambah produk'}
+            </button>
+          </form>
+        </Modal>
+      )}
+      {stockModal && stockProduct && (
+        <Modal title={`Perubahan stok · ${stockProduct.nama}`} onClose={() => setStockModal(false)}>
+          <form className="space-y-3" onSubmit={saveStockChange}>
+            <div className="rounded-xl bg-canvas p-3 text-sm">
+              <span className="text-muted">Stok tersedia</span>
+              <p className="mt-1 font-semibold">{stockProduct.stok} unit</p>
+            </div>
+            <label className="block">
+              <span className="label">Jenis perubahan</span>
+              <select className="field" value={stockForm.movement_type} onChange={(event) => setStockForm({ ...stockForm, movement_type: event.target.value })}>
+                <option value="receipt">Penerimaan stok</option>
+                <option value="adjustment">Penyesuaian / stok rusak</option>
+              </select>
+            </label>
+            <Field
+              label={stockForm.movement_type === 'receipt' ? 'Jumlah unit diterima' : 'Perubahan unit (+/-)'}
+              type="number"
+              min={stockForm.movement_type === 'receipt' ? '1' : undefined}
+              step="1"
+              placeholder={stockForm.movement_type === 'receipt' ? 'Contoh: 24' : 'Contoh: -2 untuk stok rusak'}
+              value={stockForm.quantity_change}
+              onChange={(event) => setStockForm({ ...stockForm, quantity_change: event.target.value })}
+              required
+            />
+            <label className="block">
+              <span className="label">Alasan / referensi</span>
+              <textarea className="field min-h-20" maxLength={255} value={stockForm.note} onChange={(event) => setStockForm({ ...stockForm, note: event.target.value })} placeholder="Contoh: Pembelian faktur INV-2026-010" required />
+            </label>
+            {errorMessage && <Alert type="error">{errorMessage}</Alert>}
+            <button className="btn-primary w-full" disabled={busy}>
+              {busy ? 'Menyimpan...' : 'Simpan perubahan stok'}
             </button>
           </form>
         </Modal>

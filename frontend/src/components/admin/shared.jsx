@@ -232,6 +232,7 @@ export function typeName(type) {
   return (
     {
       belanja: 'Belanja',
+      refund_belanja: 'Refund belanja',
       topup: 'Top up',
       tarik: 'Penarikan',
       biaya_layanan: 'Biaya layanan',

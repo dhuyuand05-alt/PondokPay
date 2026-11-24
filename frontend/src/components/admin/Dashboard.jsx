@@ -143,7 +143,7 @@ export function AdminDashboard({ token, user }) {
                         </td>
                         <td className="table-cell">{item.keterangan || item.nama_kantin || '—'}</td>
                         <td className="table-cell font-semibold">
-                          {item.tipe_transaksi === 'topup' ? '+' : '−'}
+                          {['topup', 'refund_belanja'].includes(item.tipe_transaksi) ? '+' : '−'}
                           {formatMoney(item.jumlah)}
                         </td>
                         <td className="table-cell">{formatMoney(item.saldo_akhir)}</td>

@@ -7,7 +7,11 @@ import {
   CircleCheck,
   CreditCard,
   Fingerprint,
+  Pause,
   Package,
+  Play,
+  Trash2,
+  Wallet,
   ShieldCheck,
 } from 'lucide-react';
 import { api, idempotencyKey } from '../../api.js';
@@ -18,8 +22,10 @@ import {
   Avatar,
   Empty,
   ErrorNotice,
+  Field,
   formatDate,
   formatMoney,
+  Modal,
   MobileLoading,
   StatusBadge,
 } from '../../ui.jsx';
@@ -41,6 +47,12 @@ export function CashierHome({ token }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [shiftModal, setShiftModal] = useState(false);
+  const [shiftResult, setShiftResult] = useState(null);
+  const [cartModal, setCartModal] = useState(false);
+  const [heldCartsOpen, setHeldCartsOpen] = useState(false);
+  const [cartLabel, setCartLabel] = useState('');
+  const [cartMessage, setCartMessage] = useState('');
   const idempotency = useRef(null);
   const field = METHOD_FIELDS[method];
   const {
@@ -62,8 +74,150 @@ export function CashierHome({ token }) {
     loading: catalogLoading,
     error: catalogError,
     refresh: refreshCatalog,
+    setData: setCatalogData,
   } = useApiData(catalogPath, token);
   const catalogProducts = catalogData?.data || [];
+  const shiftPath = selectedCanteen ? `/kantin/${selectedCanteen.id}/giliran/aktif` : '/kantin';
+  const {
+    data: shiftData,
+    loading: shiftLoading,
+    error: shiftError,
+    refresh: refreshShift,
+  } = useApiData(shiftPath, token);
+  const currentShift = shiftData?.data;
+  const heldCartsPath = selectedCanteen ? `/kantin/${selectedCanteen.id}/keranjang-tertahan` : '/kantin';
+  const {
+    data: heldCartData,
+    loading: heldCartsLoading,
+    error: heldCartsError,
+    refresh: refreshHeldCarts,
+  } = useApiData(heldCartsPath, token);
+  const heldCarts = heldCartData?.data || [];
+
+  const openShift = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.post(`/kantin/${selectedCanteen.id}/giliran/buka`, {}, token);
+      setShiftResult(null);
+      refreshShift();
+    } catch (err) {
+      setError(err.message);
+      refreshShift();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const closeShift = async () => {
+    if (!currentShift || cartItems.length || amount || step !== 'amount') return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api.post(
+        `/kantin/${selectedCanteen.id}/giliran/${currentShift.id}/tutup`,
+        {},
+        token,
+      );
+      setShiftResult(result.data);
+      setShiftModal(false);
+      refreshShift();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const holdCart = async (event) => {
+    event.preventDefault();
+    if (!selectedCanteen || !cartItems.length) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.post(
+        `/kantin/${selectedCanteen.id}/keranjang-tertahan`,
+        { label: cartLabel, items: cartItems },
+        token,
+      );
+      setCartItems([]);
+      setAmount('');
+      setDescription('');
+      setCartLabel('');
+      setCartModal(false);
+      setNotice('Keranjang disimpan. Kasir dapat melayani transaksi lain.');
+      refreshHeldCarts();
+      refreshCatalog();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restoreHeldCart = async (heldCart) => {
+    let items;
+    try {
+      items = typeof heldCart.items === 'string' ? JSON.parse(heldCart.items) : heldCart.items;
+    } catch {
+      setError('Isi keranjang tertahan tidak dapat dibaca. Hapus keranjang tersebut dan coba lagi.');
+      return;
+    }
+    if (!Array.isArray(items) || !items.length) {
+      setError('Keranjang tertahan kosong atau formatnya tidak valid.');
+      return;
+    }
+    if (cartItems.length || amount || step !== 'amount') {
+      setError('Selesaikan atau kosongkan transaksi saat ini sebelum memulihkan keranjang.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const freshCatalog = await api.get(`/kantin/${selectedCanteen.id}/produk`, token);
+      const currentProducts = freshCatalog?.data || [];
+      setCatalogData(freshCatalog);
+      const currentProductMap = new Map(currentProducts.map((product) => [Number(product.id), product]));
+      const unavailable = items.find((item) => {
+        const product = currentProductMap.get(Number(item.product_id));
+        return !product || Number(product.is_active) !== 1 || Number(item.quantity) > Number(product.stok);
+      });
+      if (unavailable) {
+        setError('Stok atau ketersediaan produk berubah. Periksa katalog dan sesuaikan keranjang sebelum memulihkan.');
+        return;
+      }
+      await api.delete(`/kantin/${selectedCanteen.id}/keranjang-tertahan/${heldCart.id}`, token);
+      setSaleMode('catalog');
+      setCartItems(items);
+      const total = items.reduce((sum, item) => {
+        const product = currentProductMap.get(Number(item.product_id));
+        return sum + Number(product.harga) * Number(item.quantity);
+      }, 0);
+      setAmount(total.toFixed(2));
+      setDescription('Pembelian katalog');
+      setStep('amount');
+      setCartMessage(`Keranjang "${heldCart.label}" dipulihkan.`);
+      setError('');
+      refreshHeldCarts();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteHeldCart = async (heldCart) => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.delete(`/kantin/${selectedCanteen.id}/keranjang-tertahan/${heldCart.id}`, token);
+      refreshHeldCarts();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const lookupStudent = async (event) => {
     event.preventDefault();
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
@@ -134,6 +288,7 @@ export function CashierHome({ token }) {
       if (selectedCanteen?.catalog_enabled) {
         refreshCatalog();
       }
+      refreshShift();
     } catch (err) {
       setError(err.message);
       if (err.status === 409)
@@ -211,9 +366,68 @@ export function CashierHome({ token }) {
         description="Akun kasir belum ditugaskan ke kantin aktif."
       />
     );
+  if (shiftLoading) return <MobileLoading text="Memeriksa giliran kasir..." />;
+  if (shiftError) return <ErrorNotice error={shiftError} onRetry={refreshShift} />;
+  if (!currentShift) {
+    return (
+      <div className="mx-auto max-w-xl space-y-4">
+        {shiftResult && (
+          <Alert type="success">
+            Giliran ditutup. Penjualan {formatMoney(shiftResult.sales_total)}, refund {formatMoney(shiftResult.refunds_total)}, bersih {formatMoney(shiftResult.net_total)}.
+          </Alert>
+        )}
+        <section className="card overflow-hidden">
+          <div className="bg-pondok-700 px-5 py-6 text-white sm:px-7">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10"><Wallet size={22} /></div>
+            <h1 className="mt-4 text-xl font-semibold">Mulai giliran kasir</h1>
+            <p className="mt-2 text-sm leading-relaxed text-white/75">
+              Buka giliran sebelum melayani transaksi. Penjualan dan refund akan masuk ke rekap giliran ini; pembayaran tetap menggunakan saldo santri.
+            </p>
+          </div>
+          <div className="p-5 sm:p-7">
+            <p className="font-semibold">{selectedCanteen.nama}</p>
+            <p className="mt-1 text-xs text-muted">Setelah giliran ditutup, kasir perlu membuka giliran baru untuk bertransaksi kembali.</p>
+            {error && <Alert type="error" className="mt-4">{error}</Alert>}
+            <button type="button" className="btn-primary mt-5 min-h-12 w-full" disabled={busy} onClick={openShift}>
+              <Play size={17} />{busy ? 'Membuka giliran...' : 'Buka giliran kasir'}
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
-    <div className={`mx-auto w-full ${usesCatalog ? 'max-w-[1180px]' : 'max-w-3xl'}`}>
+    <div className={`mx-auto w-full ${usesCatalog ? 'max-w-[1180px]' : 'max-w-3xl'} ${usesCatalog && step === 'amount' && cartItems.length ? 'pb-32 lg:pb-0' : ''}`}>
+      {step === 'amount' && (
+        <section className="card mb-5 flex flex-col gap-3 overflow-hidden border-pondok-100 bg-gradient-to-r from-white to-pondok-50/50 p-3.5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="grid h-2.5 w-2.5 place-items-center rounded-full bg-emerald-100">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+              </span>
+              <p className="text-sm font-semibold">Giliran #{currentShift.id} aktif</p>
+              <span className="hidden text-xs text-muted sm:inline">{formatDate(currentShift.opened_at, true)}</span>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              {selectedCanteen.nama} <span className="mx-1 text-line">·</span>
+              {currentShift.sales_count || 0} penjualan <span className="mx-1 text-line">·</span>
+              {currentShift.refunds_count || 0} refund <span className="mx-1 text-line">·</span>
+              Bersih <strong className="font-semibold text-ink">{formatMoney(currentShift.net_total || 0)}</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary w-full !min-h-10 !py-2 text-xs sm:w-auto"
+            disabled={busy || Boolean(cartItems.length) || Boolean(amount)}
+            onClick={() => setShiftModal(true)}
+          >
+            Tutup giliran
+          </button>
+        </section>
+      )}
+      {cartMessage && <Alert type="success" className="mb-4">{cartMessage}</Alert>}
+      {error && step === 'amount' && <Alert type="error" className="mb-4">{error}</Alert>}
       {step !== 'amount' && step !== 'success' && (
         <button
           className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 font-semibold text-pondok-700 transition hover:bg-pondok-50"
@@ -289,23 +503,58 @@ export function CashierHome({ token }) {
               ) : catalogLoading ? (
                 <MobileLoading text="Memuat katalog..." />
               ) : (
-                <CatalogPOS
-                  products={catalogProducts}
-                  cartItems={cartItems}
-                  setCartItems={setCartItems}
-                  onCheckout={() => {
-                    const productsById = new Map(catalogProducts.map((product) => [Number(product.id), product]));
-                    const total = cartItems.reduce((sum, item) => {
-                      const product = productsById.get(Number(item.product_id));
-                      return sum + Number(product?.harga || 0) * item.quantity;
-                    }, 0);
-                    if (!cartItems.length || total <= 0) return;
-                    setAmount(total.toFixed(2));
-                    setDescription('Pembelian katalog');
-                    setError('');
-                    setStep('credential');
-                  }}
-                />
+                <>
+                  <section className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white p-3">
+                    <p className="text-xs text-muted">{cartItems.reduce((sum, item) => sum + Number(item.quantity), 0)} item di keranjang saat ini</p>
+                    <div className="flex gap-2">
+                      <button type="button" className="btn-secondary !min-h-9 !px-3 !py-1.5 text-xs" disabled={!cartItems.length || busy} onClick={() => { setCartLabel(`Antrean ${heldCarts.length + 1}`); setCartModal(true); }}>
+                        <Pause size={15} />Tahan keranjang
+                      </button>
+                      <button type="button" className="btn-secondary !min-h-9 !px-3 !py-1.5 text-xs" onClick={() => setHeldCartsOpen((open) => !open)} aria-expanded={heldCartsOpen}>
+                        <Package size={15} />Tertahan ({heldCarts.length})
+                      </button>
+                    </div>
+                  </section>
+                  {heldCartsOpen && (
+                    <section className="mb-3 rounded-xl border border-line bg-white p-3">
+                      <h2 className="text-sm font-semibold">Keranjang tertahan</h2>
+                      {heldCartsError && <ErrorNotice error={heldCartsError} onRetry={refreshHeldCarts} />}
+                      {heldCartsLoading ? <MobileLoading text="Memuat keranjang..." /> : !heldCarts.length ? (
+                        <p className="mt-2 text-xs text-muted">Belum ada keranjang tertahan.</p>
+                      ) : (
+                        <div className="mt-2 divide-y divide-line">
+                          {heldCarts.map((heldCart) => (
+                            <div key={heldCart.id} className="flex items-center gap-2 py-2.5">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-semibold">{heldCart.label}</p>
+                                <p className="mt-0.5 text-[10px] text-muted">{heldCart.cashier_username} · {formatDate(heldCart.updated_at, true)}</p>
+                              </div>
+                              <button type="button" className="btn-primary !min-h-9 !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => restoreHeldCart(heldCart)}>Pulihkan</button>
+                              <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-red-600 hover:bg-red-50" aria-label={`Hapus ${heldCart.label}`} disabled={busy} onClick={() => deleteHeldCart(heldCart)}><Trash2 size={15} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  )}
+                  <CatalogPOS
+                    products={catalogProducts}
+                    cartItems={cartItems}
+                    setCartItems={setCartItems}
+                    onCheckout={() => {
+                      const productsById = new Map(catalogProducts.map((product) => [Number(product.id), product]));
+                      const total = cartItems.reduce((sum, item) => {
+                        const product = productsById.get(Number(item.product_id));
+                        return sum + Number(product?.harga || 0) * item.quantity;
+                      }, 0);
+                      if (!cartItems.length || total <= 0) return;
+                      setAmount(total.toFixed(2));
+                      setDescription('Pembelian katalog');
+                      setError('');
+                      setStep('credential');
+                    }}
+                  />
+                </>
               )}
             </section>
           ) : (
@@ -489,7 +738,7 @@ export function CashierHome({ token }) {
               : <Alert className="mt-2"><ShieldCheck size={15} />Saldo dan sisa limit mencukupi untuk belanja ini.</Alert>}
           </section>
           <p className="mt-3 text-[10px] leading-relaxed text-muted">Jika harga atau stok berubah, pilihan tetap tersimpan. Tinjau perubahan dan konfirmasi ulang. Jika koneksi terputus, ulangi transaksi yang sama dan jangan mulai transaksi baru.</p>
-          <div className="fixed inset-x-0 bottom-[50px] z-20 border-t border-line bg-white px-4 py-2 lg:static lg:mt-4 lg:border-0 lg:bg-transparent lg:p-0">
+          <div className="fixed inset-x-0 bottom-[calc(3.25rem+env(safe-area-inset-bottom))] z-20 border-t border-line bg-white/95 px-4 py-2 shadow-[0_-5px_18px_rgba(24,63,54,0.07)] backdrop-blur-xl lg:static lg:mt-4 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
             <div className="mx-auto flex max-w-[760px] items-center justify-between text-xs">
               <span className="text-muted">Total pembayaran</span><span className="font-semibold">{formatMoney(amount)}</span>
             </div>
@@ -557,6 +806,40 @@ export function CashierHome({ token }) {
             Lihat riwayat kantin
           </button>
         </div>
+      )}
+      {shiftModal && currentShift && (
+        <Modal title="Tutup giliran kasir?" onClose={() => setShiftModal(false)}>
+          <div className="space-y-3">
+            <Alert type="warning">
+              Setelah ditutup, penjualan baru tidak dapat dicatat sampai giliran berikutnya dibuka. Rekap ini menghitung pembayaran dari saldo santri, bukan uang tunai di laci.
+            </Alert>
+            <div className="rounded-xl bg-canvas p-4">
+              <AmountLine label="Penjualan" amount={formatMoney(currentShift.sales_total || 0)} />
+              <AmountLine label="Refund" amount={formatMoney(currentShift.refunds_total || 0)} />
+              <AmountLine label="Total bersih" amount={formatMoney(currentShift.net_total || 0)} positive />
+              <AmountLine label="Jumlah transaksi" amount={String(currentShift.sales_count || 0)} />
+            </div>
+            {error && <Alert type="error">{error}</Alert>}
+            <div className="flex gap-2">
+              <button type="button" className="btn-secondary flex-1" onClick={() => setShiftModal(false)}>Kembali</button>
+              <button type="button" className="btn-primary flex-1" disabled={busy} onClick={closeShift}>{busy ? 'Menutup...' : 'Tutup giliran'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {cartModal && (
+        <Modal title="Tahan keranjang" onClose={() => setCartModal(false)}>
+          <form className="space-y-3" onSubmit={holdCart}>
+            <Alert>
+              Keranjang akan tersimpan di server untuk akun kasir ini. Harga dan stok akan diperiksa ulang saat keranjang dipulihkan.
+            </Alert>
+            <Field label="Nama / nomor antrean" value={cartLabel} onChange={(event) => setCartLabel(event.target.value)} maxLength={80} required />
+            {error && <Alert type="error">{error}</Alert>}
+            <button className="btn-primary w-full" disabled={busy || !cartItems.length}>
+              {busy ? 'Menyimpan...' : 'Simpan dan kosongkan keranjang'}
+            </button>
+          </form>
+        </Modal>
       )}
     </div>
   );

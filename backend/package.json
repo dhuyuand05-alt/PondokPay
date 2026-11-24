@@ -27,5 +27,8 @@
     "mysql2": "^3.24.6",
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4"
+  },
+  "overrides": {
+    "body-parser": "2.4.0"
   }
 }

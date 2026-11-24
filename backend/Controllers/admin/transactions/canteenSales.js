@@ -4,6 +4,7 @@ import { consumeFinancialApproval } from '../../../services/financialApprovals.j
 import { collectCurrentServiceFeeDebt } from '../../../services/monthlyServiceFees.js';
 import { enqueueParentTransactionNotifications } from '../../../services/whatsappNotifications.js';
 import { centsToMoney, duplicateError, getIdempotencyKey, idempotencyConflict, moneyToCents, normalizeSaleItems, parseId, parseMoney, parsePagination, runInTransaction, validTransactionTypes } from '../shared.js';
+import { calculateWeightedAverageCost } from '../../canteenPurchasingUtils.js';
 
 export const createCanteenSale = async (req, res) => {
   const kantinId = parseId(req.params.id);
@@ -41,7 +42,7 @@ export const createCanteenSale = async (req, res) => {
       );
       if (!canteens.length) return { notFound: 'kantin' };
       const [previous] = await connection.query(
-        `SELECT id, santri_id, kantin_id, jumlah, saldo_akhir, keterangan, created_by
+        `SELECT id, santri_id, kantin_id, tipe_transaksi, jumlah, saldo_akhir, keterangan, created_by
          FROM transaksi WHERE idempotency_key = ? LIMIT 1`,
         [idempotencyKey]
       );
@@ -64,6 +65,7 @@ export const createCanteenSale = async (req, res) => {
           Number(transaction.created_by) !== req.user.id ||
           Number(transaction.santri_id) !== santriId ||
           Number(transaction.kantin_id) !== kantinId ||
+          transaction.tipe_transaksi !== 'belanja' ||
           !(sameItems || sameManualAmount) ||
           (transaction.keterangan ?? null) !== keterangan
         ) {
@@ -86,6 +88,21 @@ export const createCanteenSale = async (req, res) => {
         error.code = 'CANTEEN_INACTIVE';
         throw error;
       }
+      let shiftId = null;
+      if (req.user.role === 'kasir') {
+        const [shifts] = await connection.query(
+          `SELECT id FROM canteen_shifts
+           WHERE kantin_id = ? AND cashier_id = ? AND status = 'open'
+           ORDER BY id DESC LIMIT 1 FOR UPDATE`,
+          [kantinId, req.user.id]
+        );
+        if (!shifts.length) {
+          const error = new Error('Buka giliran kasir sebelum mencatat penjualan.');
+          error.code = 'CANTEEN_SHIFT_REQUIRED';
+          throw error;
+        }
+        shiftId = shifts[0].id;
+      }
       let saleItems = [];
       let amountCents;
       if (catalogRequest) {
@@ -96,7 +113,7 @@ export const createCanteenSale = async (req, res) => {
         }
         const productIds = normalizedItems.items.map((item) => item.product_id);
         const [products] = await connection.query(
-          `SELECT id, nama, sku, harga, stok
+          `SELECT id, nama, sku, harga, average_unit_cost, stok
            FROM canteen_products
            WHERE kantin_id = ? AND is_active = TRUE AND id IN (?)
            ORDER BY id FOR UPDATE`,
@@ -123,6 +140,12 @@ export const createCanteenSale = async (req, res) => {
             product,
             unitPrice: product.harga,
             subtotal: centsToMoney(subtotalCents),
+            unitCost: moneyToCents(product.average_unit_cost || '0.00') > 0n
+              ? String(product.average_unit_cost)
+              : null,
+            totalCost: moneyToCents(product.average_unit_cost || '0.00') > 0n
+              ? centsToMoney(moneyToCents(product.average_unit_cost) * BigInt(item.quantity))
+              : null,
             remainingStock: Number(product.stok) - item.quantity,
           };
         });
@@ -154,10 +177,16 @@ export const createCanteenSale = async (req, res) => {
       }
 
       const [dailyRows] = await connection.query(
-        `SELECT COALESCE(SUM(jumlah), 0) AS total
-         FROM transaksi
-         WHERE santri_id = ? AND tipe_transaksi = 'belanja'
-           AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY`,
+        `SELECT GREATEST(COALESCE(SUM(CASE
+          WHEN t.tipe_transaksi = 'belanja' THEN t.jumlah
+          WHEN original.created_at >= CURDATE()
+            AND original.created_at < CURDATE() + INTERVAL 1 DAY THEN -t.jumlah
+          ELSE 0 END), 0), 0) AS total
+        FROM transaksi t
+        LEFT JOIN canteen_sale_refunds cr ON cr.refund_transaksi_id = t.id
+        LEFT JOIN transaksi original ON original.id = cr.original_transaksi_id
+        WHERE t.santri_id = ? AND t.tipe_transaksi IN ('belanja', 'refund_belanja')
+          AND t.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY`,
         [santriId]
       );
       const spentCents = moneyToCents(dailyRows[0].total ?? '0.00');
@@ -181,17 +210,20 @@ export const createCanteenSale = async (req, res) => {
       await connection.query('UPDATE kantin SET saldo = ? WHERE id = ?', [canteenBalance, kantinId]);
       const [transaction] = await connection.query(
         `INSERT INTO transaksi
-           (santri_id, kantin_id, tipe_transaksi, jumlah, saldo_akhir, keterangan, idempotency_key, created_by)
-         VALUES (?, ?, 'belanja', ?, ?, ?, ?, ?)`,
-        [santriId, kantinId, centsToMoney(amountCents), studentBalance, keterangan, idempotencyKey, req.user.id]
+           (santri_id, kantin_id, tipe_transaksi, jumlah, saldo_akhir, keterangan,
+            idempotency_key, created_by, canteen_shift_id)
+         VALUES (?, ?, 'belanja', ?, ?, ?, ?, ?, ?)`,
+        [santriId, kantinId, centsToMoney(amountCents), studentBalance, keterangan,
+          idempotencyKey, req.user.id, shiftId]
       );
       for (const item of saleItems) {
         await connection.query(
           `INSERT INTO canteen_sale_items
-             (transaksi_id, product_id, nama_produk, sku, harga_satuan, quantity, subtotal)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (transaksi_id, product_id, nama_produk, sku, harga_satuan, harga_pokok_satuan,
+              total_harga_pokok, quantity, subtotal)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [transaction.insertId, item.product.id, item.product.nama, item.product.sku,
-            item.unitPrice, item.quantity, item.subtotal]
+            item.unitPrice, item.unitCost, item.totalCost, item.quantity, item.subtotal]
         );
         await connection.query(
           'UPDATE canteen_products SET stok = ? WHERE id = ?',
@@ -231,7 +263,7 @@ export const createCanteenSale = async (req, res) => {
     if (duplicateError(error) && idempotencyKey) {
       try {
         const [previous] = await pool.query(
-          `SELECT id, santri_id, kantin_id, jumlah, saldo_akhir, keterangan, created_by
+          `SELECT id, santri_id, kantin_id, tipe_transaksi, jumlah, saldo_akhir, keterangan, created_by
            FROM transaksi WHERE idempotency_key = ? LIMIT 1`,
           [idempotencyKey]
         );
@@ -240,6 +272,7 @@ export const createCanteenSale = async (req, res) => {
           Number(previous[0].created_by) === req.user.id &&
           Number(previous[0].santri_id) === santriId &&
           Number(previous[0].kantin_id) === kantinId &&
+          previous[0].tipe_transaksi === 'belanja' &&
           (previous[0].keterangan ?? null) === keterangan
         ) {
           const [previousItems] = await pool.query(
@@ -278,6 +311,9 @@ export const createCanteenSale = async (req, res) => {
     }
     if (error.code === 'CANTEEN_INACTIVE') {
       return res.status(409).json({ message: 'Kantin tidak aktif dan tidak dapat menerima transaksi.' });
+    }
+    if (error.code === 'CANTEEN_SHIFT_REQUIRED') {
+      return res.status(409).json({ message: error.message, shift_required: true });
     }
     if (error.code === 'INSUFFICIENT_STUDENT_BALANCE') {
       return res.status(409).json({ message: 'Saldo santri tidak mencukupi.' });

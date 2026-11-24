@@ -33,19 +33,15 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 ::selection { color: white; background: #078264; }
 
-.admin-nav-scrollbar {
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+.admin-nav-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
   scrollbar-width: thin;
 }
-.admin-nav-scrollbar::-webkit-scrollbar { width: 6px; }
-.admin-nav-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.admin-nav-scrollbar::-webkit-scrollbar-button { display: none; }
-.admin-nav-scrollbar::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-}
-.admin-nav-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.38); }
-.admin-nav-scrollbar a[aria-current="page"] svg { color: var(--color-pondok-200); }
+.admin-nav-scroll::-webkit-scrollbar { width: 6px; }
+.admin-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.admin-nav-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255, 255, 255, 0.28); }
+.admin-nav-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.45); }
+.admin-nav-scroll a[aria-current="page"] svg { color: var(--color-pondok-200); }
 
 @keyframes landing-enter {
   from { opacity: 0; transform: translateY(14px); }
