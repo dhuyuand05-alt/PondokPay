@@ -308,6 +308,14 @@ function LandingPage({ institution }) {
               <Link to="/dokumentasi" className="btn-secondary min-h-11 justify-center px-5"><BookOpen size={17} /> Baca dokumentasi</Link>
               <Link to={loginHref} className="btn-primary min-h-11 justify-center px-5">Masuk aplikasi <ArrowRight size={17} /></Link>
             </div>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-[#08745a]">
+              <a className="inline-flex items-center gap-1.5 hover:underline" href="/presentasi-pondokpay.html" target="_blank" rel="noreferrer">
+                Presentasi hasil <ArrowUpRight size={14} />
+              </a>
+              <a className="inline-flex items-center gap-1.5 hover:underline" href="/design-thinking.html" target="_blank" rel="noreferrer">
+                Design Thinking <ArrowUpRight size={14} />
+              </a>
+            </div>
           </div>
         </section>
       </main>

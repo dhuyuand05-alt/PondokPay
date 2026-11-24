@@ -1,0 +1,2325 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#060b09">
+  <title>PondokPay — Presentasi Hasil Proyek · Rubaya</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070d0a;
+      --surface: rgba(255, 255, 255, 0.035);
+      --surface-strong: rgba(255, 255, 255, 0.07);
+      --border: rgba(255, 255, 255, 0.11);
+      --ink: #f3f7f4;
+      --ink-soft: #c7d4cc;
+      --ink-muted: #86998e;
+      --accent: #cbff63;
+      --accent-2: #2dd4bf;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --violet: #a78bfa;
+      --sky: #38bdf8;
+      --card-bg: rgba(13, 22, 18, 0.72);
+      --radius: 22px;
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.75s cubic-bezier(0.22, 1, 0.36, 1), color 0.6s ease;
+    }
+    ::selection { background: var(--accent); color: #070d0a; }
+    button, input { font-family: inherit; }
+
+    /* Dynamic Atmospheric Canvas & Aurora Backdrop */
+    .ambient-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    #particle-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.55;
+    }
+    .aurora-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.38;
+      transition: all 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform, background;
+    }
+    .orb-a { width: 54vw; height: 54vw; top: -18%; right: -10%; background: radial-gradient(circle, var(--accent-2), transparent 70%); }
+    .orb-b { width: 46vw; height: 46vw; bottom: -20%; left: -10%; background: radial-gradient(circle, var(--accent), transparent 70%); }
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(currentColor 1px, transparent 1px);
+      background-size: 30px 30px;
+      opacity: 0.06;
+      mask-image: radial-gradient(ellipse 80% 75% at 50% 50%, #000 35%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 75% at 50% 50%, #000 35%, transparent 100%);
+    }
+
+    /* Top Header Bar */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 68px;
+      z-index: 50;
+      padding: 0 clamp(16px, 4vw, 56px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8, 14, 11, 0.65);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      transition: background 0.6s ease, border-color 0.6s ease;
+    }
+    body.light-theme .topbar {
+      background: rgba(246, 244, 236, 0.78);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      cursor: pointer;
+    }
+    .brand-logo {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #070d0a;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 18px;
+      box-shadow: 0 0 22px rgba(203, 255, 99, 0.35);
+      transition: transform 0.3s ease, background 0.5s ease;
+    }
+    .brand:hover .brand-logo { transform: rotate(-8deg) scale(1.06); }
+    .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.02em; }
+    .brand-sub {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-muted);
+      padding-left: 10px;
+      border-left: 1px solid var(--border);
+    }
+
+    .topbar-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .hud-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .hud-btn:hover, .hud-btn.active {
+      border-color: var(--accent);
+      background: var(--surface-strong);
+      color: var(--ink);
+    }
+    .hud-kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: rgba(0,0,0,0.28);
+      border: 1px solid var(--border);
+      color: var(--ink-muted);
+    }
+    body.light-theme .hud-kbd { background: rgba(0,0,0,0.06); }
+    .timer-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-muted);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    /* Segmented Progress Scrubber */
+    .segment-bar {
+      position: fixed;
+      top: 68px; left: 0; right: 0;
+      height: 4px;
+      z-index: 49;
+      display: grid;
+      grid-template-columns: repeat(22, 1fr);
+      gap: 2px;
+      padding: 0 2px;
+      background: transparent;
+    }
+    .seg-item {
+      height: 100%;
+      background: var(--border);
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.2s ease;
+    }
+    .seg-item:hover { transform: scaleY(2); background: var(--ink-soft); }
+    .seg-item.passed { background: var(--accent); opacity: 0.55; }
+    .seg-item.current { background: var(--accent); opacity: 1; box-shadow: 0 0 10px var(--accent); }
+
+    /* Stage & Slides */
+    .deck-stage {
+      position: relative;
+      z-index: 10;
+      width: 100vw;
+      height: 100vh;
+    }
+    .slide {
+      position: absolute;
+      inset: 72px 0 0 0;
+      padding: clamp(20px, 3.5vh, 44px) clamp(18px, 5vw, 76px) 92px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(24px) scale(0.985);
+      transition: opacity 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+                  visibility 0.52s;
+    }
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+    .wrap { width: min(1240px, 100%); margin: auto; }
+    .wrap.wide { width: min(1380px, 100%); }
+
+    /* Kinetic Stagger Animations */
+    .slide.active .stagger {
+      animation: kineticIn 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: calc(var(--d, 0) * 60ms);
+    }
+    @keyframes kineticIn {
+      from { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+      to { opacity: 1; transform: translateY(0); filter: blur(0); }
+    }
+
+    /* Editorial Typography */
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      padding: 5px 13px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .eyebrow-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(54px, 9.5vw, 132px);
+      font-weight: 700;
+      line-height: 0.91;
+      letter-spacing: -0.045em;
+      margin-bottom: 18px;
+    }
+    h2 {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 4.6vw, 60px);
+      font-weight: 700;
+      line-height: 1.03;
+      letter-spacing: -0.035em;
+      margin-bottom: 12px;
+    }
+    .serif-accent {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      color: var(--accent);
+    }
+    .head-split {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .head-split h2 { margin-bottom: 0; }
+    .head-desc {
+      max-width: 440px;
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--ink-soft);
+    }
+    .lead {
+      max-width: 680px;
+      font-size: clamp(15px, 1.6vw, 18.5px);
+      line-height: 1.62;
+      color: var(--ink-soft);
+      margin-bottom: 22px;
+    }
+
+    /* Interactive Spotlight & Tactile Cards */
+    .card {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      overflow: hidden;
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+                  border-color 0.28s ease,
+                  box-shadow 0.28s ease;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.09), transparent 62%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    body.light-theme .card::before {
+      background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(18, 109, 80, 0.09), transparent 62%);
+    }
+    .card:hover::before { opacity: 1; }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+    }
+    .card h3 { font-size: 16.5px; font-weight: 700; margin-bottom: 8px; }
+    .card p { font-size: 13px; line-height: 1.6; color: var(--ink-muted); }
+
+    .icon-box {
+      width: 42px; height: 42px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 14px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .callout {
+      margin-top: 16px;
+      padding: 13px 16px;
+      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      color: var(--ink-soft);
+      font-size: 12.5px;
+      line-height: 1.55;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    /* Grids & Asymmetric Bento Layouts */
+    .grid { display: grid; gap: 14px; }
+    .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .g-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .bento-hero-grid { grid-template-columns: 1.35fr 1fr 1fr; }
+    .bento-tall-left { grid-template-columns: 1.15fr 1fr 1fr; }
+    .bento-tall-left > :first-child { grid-row: span 2; display: flex; flex-direction: column; justify-content: space-between; }
+
+    /* SLIDE 1: 3D Holographic ID Card + Cover */
+    .cover-grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: clamp(28px, 5vw, 76px);
+      align-items: center;
+    }
+    .cover-title-grad {
+      background: linear-gradient(125deg, var(--accent) 10%, var(--accent-2) 90%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #070d0a;
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(203, 255, 99, 0.25);
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+    .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.06); }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 18px;
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-secondary:hover { border-color: var(--accent); background: var(--surface-strong); }
+
+    .holo-stage { perspective: 1100px; display: flex; justify-content: center; }
+    .holo-card {
+      position: relative;
+      width: min(100%, 350px);
+      border-radius: 44% 44% 26px 26px;
+      padding: 10px;
+      background: linear-gradient(145deg, rgba(203, 255, 99, 0.28), rgba(45, 212, 191, 0.12));
+      border: 1px solid rgba(203, 255, 99, 0.42);
+      box-shadow: 0 32px 84px rgba(0, 0, 0, 0.65);
+      transform-style: preserve-3d;
+      transition: transform 0.14s ease-out;
+    }
+    .holo-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.22) 50%, transparent 70%);
+      background-size: 200% 200%;
+      background-position: var(--glare-x, 50%) var(--glare-y, 50%);
+      pointer-events: none;
+      mix-blend-mode: overlay;
+    }
+    .holo-photo {
+      border-radius: 40% 40% 20px 20px;
+      overflow: hidden;
+      aspect-ratio: 0.8;
+      background: #102019;
+      position: relative;
+    }
+    .holo-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; display: block; }
+    .holo-badge {
+      position: absolute;
+      bottom: 18px; right: -16px;
+      padding: 12px 16px;
+      border-radius: 15px;
+      background: rgba(8, 16, 12, 0.92);
+      border: 1px solid rgba(203, 255, 99, 0.4);
+      backdrop-filter: blur(14px);
+      transform: translateZ(34px);
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.5);
+    }
+    .holo-badge strong { display: block; font-size: 13.5px; color: #f3f7f4; }
+    .holo-badge span { font-size: 11px; color: #9ab0a3; }
+
+    /* SLIDE 2: Staggered Editorial Metrics */
+    .stagger-stats { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 14px; align-items: start; }
+    .stagger-stats .card:nth-child(2) { margin-top: 22px; }
+    .stagger-stats .card:nth-child(3) { margin-top: 44px; }
+    .stagger-stats .card:nth-child(4) { margin-top: 66px; background: var(--accent); color: #070d0a; }
+    .stagger-stats .card:nth-child(4) p, .stagger-stats .card:nth-child(4) h3 { color: #070d0a; }
+    .stat-num {
+      font-family: var(--font-display);
+      font-size: clamp(44px, 5.2vw, 68px);
+      font-weight: 700;
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .stagger-stats .card:nth-child(4) .stat-num { color: #070d0a; }
+
+    /* SLIDE 3: Before vs After Mode Toggle */
+    .mode-switch {
+      display: inline-flex;
+      padding: 4px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-bottom: 18px;
+    }
+    .mode-switch button {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .mode-switch button.active {
+      background: var(--accent);
+      color: #070d0a;
+    }
+
+    /* SLIDE 4: Animated Packet Flow Architecture */
+    .arch-flow-grid {
+      display: grid;
+      grid-template-columns: 1fr 44px 1fr 44px 1fr 44px 1fr;
+      align-items: center;
+      gap: 4px;
+      margin: 16px 0;
+    }
+    .arch-node {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-bottom: 3px solid var(--accent);
+      border-radius: 18px;
+      padding: 18px 12px;
+      text-align: center;
+      color: var(--ink);
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .arch-node:hover, .arch-node.active-node {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 14px 32px rgba(45, 212, 191, 0.18);
+    }
+    .arch-node.pulse-hit {
+      animation: nodePulse 0.55s ease;
+    }
+    @keyframes nodePulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 var(--accent); }
+      50% { transform: scale(1.05); box-shadow: 0 0 0 12px transparent; }
+      100% { transform: scale(1); }
+    }
+    .wire {
+      height: 3px;
+      background: var(--border);
+      position: relative;
+      overflow: hidden;
+      border-radius: 4px;
+    }
+    .wire-packet {
+      position: absolute;
+      top: 0; left: -40%;
+      width: 40%; height: 100%;
+      background: linear-gradient(90deg, transparent, var(--accent), #fff);
+      animation: packetMove 1.8s infinite linear;
+    }
+    @keyframes packetMove { to { left: 140%; } }
+    .arch-telemetry {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+      margin-top: 12px;
+    }
+    .json-box {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.6;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: #050a08;
+      color: #a7f3d0;
+      border: 1px solid rgba(45, 212, 191, 0.28);
+      overflow-x: auto;
+    }
+
+    /* SLIDE 5: Tech Filter Pills */
+    .filter-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .pill-btn {
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .pill-btn:hover, .pill-btn.active {
+      background: var(--accent);
+      color: #070d0a;
+      border-color: var(--accent);
+    }
+    .tech-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 15px 16px;
+      border-radius: 16px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      transition: all 0.25s ease;
+    }
+    .tech-card.dim { opacity: 0.22; transform: scale(0.97); }
+    .tech-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+    .tech-badge {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12px;
+      background: var(--surface-strong);
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+
+    /* SLIDE 6: Interactive ERD + Column Inspector */
+    .erd-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+    .erd-col { display: grid; gap: 9px; }
+    .tbl-btn {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      text-align: left;
+      color: var(--ink);
+      cursor: pointer;
+      transition: all 0.22s ease;
+    }
+    .tbl-btn:hover, .tbl-btn.selected {
+      border-color: var(--accent);
+      background: var(--surface-strong);
+      transform: translateY(-2px);
+    }
+    .tbl-btn.linked {
+      border-color: var(--accent-2);
+      box-shadow: 0 0 0 1px var(--accent-2);
+    }
+    .tbl-btn code {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 3px;
+    }
+    .tbl-btn small { display: block; font-size: 11px; color: var(--ink-muted); }
+    .erd-inspector {
+      margin-top: 14px;
+      padding: 13px 16px;
+      border-radius: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12.5px;
+    }
+
+    /* SLIDE 8: Interactive Security Stress-Test */
+    .sec-lab {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-radius: 16px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .sec-result {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      color: var(--accent);
+    }
+
+    /* SLIDES 9, 11, 13: Role Menu + Live Mini UI Wireframe Inspector */
+    .role-workbench {
+      display: grid;
+      grid-template-columns: 1.45fr 0.75fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .menu-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+    .menu-cards.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .m-card {
+      padding: 13px 14px;
+      border-radius: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      text-align: left;
+      color: var(--ink);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+    .m-card:hover, .m-card.active {
+      border-color: var(--accent);
+      background: var(--surface-strong);
+      transform: translateY(-2px);
+    }
+    .m-num { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .m-card strong { display: block; font-size: 13px; margin-bottom: 3px; }
+    .m-card small { display: block; font-size: 10.5px; color: var(--ink-muted); line-height: 1.4; margin-bottom: 8px; }
+    .m-route {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--accent-2);
+      align-self: flex-start;
+    }
+    .wireframe-preview {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      position: sticky;
+      top: 0;
+    }
+    .wf-screen {
+      margin-top: 12px;
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+    body.light-theme .wf-screen { background: rgba(0, 0, 0, 0.04); }
+
+    /* Galleries */
+    .gal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .gal-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .gal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      text-align: left;
+      color: var(--ink);
+      transition: all 0.26s ease;
+    }
+    .gal-card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 16px 36px rgba(0,0,0,0.3); }
+    .gal-thumb { width: 100%; aspect-ratio: 16/10; overflow: hidden; background: #0c1712; }
+    .gal-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform 0.4s ease; }
+    .gal-card:hover .gal-thumb img { transform: scale(1.05); }
+    .gal-meta { padding: 11px 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .gal-meta strong { display: block; font-size: 12px; }
+    .gal-meta small { display: block; font-size: 10px; color: var(--ink-muted); margin-top: 2px; }
+
+    /* SLIDE 15: Full Interactive POS & Wali Simulator */
+    .pos-lab { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 16px; margin-top: 12px; }
+    .step-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .step-node {
+      padding: 10px 8px;
+      border-radius: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      text-align: center;
+      font-size: 11px;
+      transition: all 0.3s ease;
+    }
+    .step-node.active { border-color: var(--accent); background: var(--surface-strong); color: var(--accent); font-weight: 700; transform: translateY(-3px); }
+    .step-node.done { border-color: var(--accent-2); color: var(--accent-2); }
+    .santri-chip {
+      padding: 7px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .santri-chip.active { border-color: var(--accent); background: var(--accent); color: #070d0a; }
+    .snack-btn {
+      padding: 8px 11px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .snack-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .sim-terminal {
+      background: #050a08;
+      border: 1px solid rgba(45, 212, 191, 0.3);
+      border-radius: 14px;
+      padding: 13px 15px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.7;
+      color: #d1fae5;
+      min-height: 132px;
+    }
+
+    /* SLIDE 17: Interactive VPS Terminal */
+    .vps-box {
+      background: #050a08;
+      border: 1px solid rgba(45, 212, 191, 0.35);
+      border-radius: 18px;
+      padding: 20px;
+      font-family: var(--font-mono);
+      color: #e2e8f0;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    }
+    .vps-cmd-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .vps-cmd-btn {
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.14);
+      color: #a7f3d0;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      cursor: pointer;
+    }
+    .vps-cmd-btn:hover, .vps-cmd-btn.active { background: #2dd4bf; color: #050a08; font-weight: 700; }
+
+    /* Floating Bottom Dock */
+    .dock {
+      position: fixed;
+      bottom: 18px;
+      right: clamp(16px, 4vw, 56px);
+      z-index: 45;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(10, 18, 14, 0.82);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
+    body.light-theme .dock { background: rgba(255, 255, 255, 0.88); }
+    .dock button {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--ink);
+      font-size: 16px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: all 0.2s ease;
+    }
+    .dock button:hover { background: var(--accent); color: #070d0a; }
+    .dock-counter {
+      padding: 0 10px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+    .key-hints {
+      position: fixed;
+      bottom: 26px;
+      left: clamp(16px, 4vw, 56px);
+      z-index: 40;
+      font-size: 11px;
+      color: var(--ink-muted);
+      display: flex;
+      gap: 12px;
+    }
+
+    /* Modals (Command Palette & Lightbox) */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 95;
+      background: rgba(4, 8, 6, 0.86);
+      backdrop-filter: blur(22px);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+    }
+    .modal-backdrop.open { opacity: 1; visibility: visible; }
+    .palette-card {
+      width: min(1080px, 100%);
+      max-height: 85vh;
+      overflow-y: auto;
+      background: #0b1410;
+      color: #f3f7f4;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 24px;
+      padding: clamp(20px, 3.5vw, 34px);
+    }
+    .palette-input {
+      width: 100%;
+      padding: 13px 16px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.14);
+      color: #f3f7f4;
+      font-size: 14px;
+      margin: 14px 0 18px;
+      outline: none;
+    }
+    .palette-input:focus { border-color: #cbff63; }
+    .palette-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .pal-item {
+      padding: 13px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #f3f7f4;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .pal-item:hover, .pal-item.active { border-color: #cbff63; background: rgba(203,255,99,0.14); transform: translateY(-2px); }
+    .pal-item span { display: block; font-family: var(--font-mono); font-size: 10px; color: #cbff63; margin-bottom: 4px; }
+    .pal-item strong { display: block; font-size: 12.5px; }
+
+    .lb-box { position: relative; width: min(1120px, 100%); text-align: center; color: #f3f7f4; }
+    .lb-box img { max-width: 100%; max-height: 75vh; border-radius: 16px; border: 1px solid rgba(255,255,255,0.15); background: #102019; transition: transform 0.25s ease; cursor: zoom-in; }
+    .lb-box img.zoomed { transform: scale(1.35); cursor: zoom-out; }
+    .lb-btn {
+      position: absolute;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(11, 20, 16, 0.9);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: #f3f7f4;
+      font-size: 20px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    .lb-btn:hover { background: #cbff63; color: #070d0a; }
+    .lb-close { top: -20px; right: 0; }
+    .lb-prev { top: 50%; left: -52px; transform: translateY(-50%); }
+    .lb-next { top: 50%; right: -52px; transform: translateY(-50%); }
+
+    @media (max-width: 980px) {
+      .cover-grid, .erd-layout, .role-workbench, .pos-lab, .arch-telemetry { grid-template-columns: 1fr; }
+      .stagger-stats, .g-4, .gal-grid, .palette-list { grid-template-columns: repeat(2, 1fr); }
+      .stagger-stats .card:nth-child(n) { margin-top: 0; }
+      .arch-flow-grid { grid-template-columns: 1fr; }
+      .wire { width: 3px; height: 24px; margin: 0 auto; }
+      .head-split { flex-direction: column; align-items: flex-start; gap: 10px; }
+    }
+    @media (max-width: 640px) {
+      .g-2, .g-3, .g-4, .stagger-stats, .gal-grid, .gal-grid.cols-3, .menu-cards, .menu-cards.cols-2, .step-track { grid-template-columns: 1fr; }
+      .key-hints, .brand-sub, .timer-pill { display: none; }
+      .dock { right: 50%; transform: translateX(50%); bottom: 12px; }
+      .lb-prev { left: 8px; top: auto; bottom: -52px; transform: none; }
+      .lb-next { right: 8px; top: auto; bottom: -52px; transform: none; }
+    }
+    @media print {
+      html, body { overflow: visible; height: auto; background: #fff !important; color: #111 !important; }
+      .ambient-layer, .topbar, .segment-bar, .dock, .key-hints, .modal-backdrop { display: none !important; }
+      .slide { position: relative; inset: auto; opacity: 1 !important; visibility: visible !important; transform: none !important; page-break-after: always; min-height: 100vh; }
+      .card { background: #f8faf9 !important; border-color: #cbd5e1 !important; color: #0f172a !important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient Dynamic Background -->
+  <div class="ambient-layer">
+    <canvas id="particle-canvas"></canvas>
+    <div class="grid-overlay"></div>
+    <div class="aurora-orb orb-a"></div>
+    <div class="aurora-orb orb-b"></div>
+  </div>
+
+  <!-- Top Navigation -->
+  <header class="topbar">
+    <div class="brand" id="go-home" title="Kembali ke Sampul">
+      <div class="brand-logo">P</div>
+      <span class="brand-name">PONDOKPAY</span>
+      <span class="brand-sub">PROJECT SHOWCASE · RUBAYA</span>
+    </div>
+    <div class="topbar-controls">
+      <span class="timer-pill" id="pres-timer" title="Durasi presentasi">00:00</span>
+      <button class="hud-btn" id="sound-toggle" type="button" title="Suara klik interaktif">🔇 Audio</button>
+      <button class="hud-btn" id="autoplay-toggle" type="button" title="Putar otomatis slide">▶ Auto</button>
+      <button class="hud-btn" id="open-palette" type="button">
+        <span>Peta Slide</span>
+        <span class="hud-kbd">Ctrl+K</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 22-Segment Interactive Scrubber -->
+  <div class="segment-bar" id="segment-bar" role="tablist" aria-label="Navigasi cepat antar slide"></div>
+
+  <main class="deck-stage" id="deck-stage">
+
+    <!-- SLIDE 01: SAMPUL -->
+    <section class="slide active" data-title="Sampul" data-mode="dark" data-bg="#070d0a" data-ink="#f3f7f4" data-soft="#c7d4cc" data-muted="#86998e" data-accent="#cbff63" data-accent2="#2dd4bf" data-card="rgba(13,22,18,0.72)">
+      <div class="wrap">
+        <div class="cover-grid">
+          <div>
+            <div class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> Presentasi Hasil Proyek Akhir</div>
+            <h1 class="stagger" style="--d:1">Pondok<span class="cover-title-grad">Pay</span></h1>
+            <p class="lead stagger" style="--d:2">Sistem pembayaran nontunai dan pengelolaan transaksi kantin yang menghubungkan pondok, santri, orang tua, serta kasir dalam satu alur yang tercatat.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;" class="stagger" style="--d:3">
+              <span class="eyebrow" style="margin:0;color:var(--ink);">Rubaya · Peserta Pelatihan</span>
+              <span class="eyebrow" style="margin:0;">Pengembangan Web</span>
+              <span class="eyebrow" style="margin:0;">Node.js</span>
+              <span class="eyebrow" style="margin:0;">React</span>
+            </div>
+            <div class="cta-row stagger" style="--d:4">
+              <button type="button" class="btn-primary" onclick="goToSlide(1)">Mulai Presentasi →</button>
+              <button type="button" class="btn-secondary" onclick="goToSlide(14)">⚡ Coba Simulator POS</button>
+            </div>
+          </div>
+          <div class="holo-stage stagger" style="--d:2">
+            <div class="holo-card" id="holo-card">
+              <div class="holo-photo">
+                <img src="pasfoto.jpeg" alt="Foto Rubaya" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div style="display:none;width:100%;height:100%;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(160deg,#12261d,#09120e);">
+                  <div style="width:76px;height:76px;border-radius:50%;background:var(--accent);color:#070d0a;display:grid;place-items:center;font-family:var(--font-display);font-size:34px;font-weight:800;">R</div>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);">PONDOKPAY CREATOR</span>
+                </div>
+              </div>
+              <div class="holo-badge">
+                <strong>Rubaya</strong>
+                <span>Pengembangan Web dengan Node.js dan React</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 02: RINGKASAN (WARM IVORY EDITORIAL) -->
+    <section class="slide" data-title="Gambaran proyek" data-mode="light" data-bg="#f4f2e8" data-ink="#153228" data-soft="#365549" data-muted="#5d776c" data-accent="#126d50" data-accent2="#217c80" data-card="rgba(255,255,255,0.82)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 01 · Ringkasan</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Satu saldo.<br><span class="serif-accent">Tiga pengalaman.</span></h2>
+          <p class="head-desc">PondokPay merapikan alur uang saku dan pembelian kantin: saldo santri, kendali wali, dan pencatatan pengelola.</p>
+        </div>
+        <div class="stagger-stats stagger" style="--d:2">
+          <article class="card">
+            <div class="stat-num" data-count="1" data-pad="2">01</div>
+            <h3>Ledger Terpusat</h3>
+            <p>Ledger transaksi terpusat untuk top-up, belanja, tarik saldo, dan biaya layanan.</p>
+          </article>
+          <article class="card">
+            <div class="stat-num" data-count="3" data-pad="2">03</div>
+            <h3>Pengalaman Utama</h3>
+            <p>Pengalaman utama untuk admin pondok, wali santri, dan kasir kantin.</p>
+          </article>
+          <article class="card">
+            <div class="stat-num" data-count="16" data-pad="2">16</div>
+            <h3>Layar Desain UI</h3>
+            <p>Gambar layar rancangan UI yang tersedia di repositori dan ditampilkan dalam galeri.</p>
+          </article>
+          <article class="card">
+            <div class="stat-num">TLS</div>
+            <h3>HTTPS Publik</h3>
+            <p>Domain publik PondokPay dilayani melalui koneksi HTTPS terenkripsi.</p>
+          </article>
+        </div>
+        <div class="callout stagger" style="--d:3">
+          <span>ℹ️</span>
+          <span>Angka di atas menjelaskan cakupan presentasi dan layanan; bukan jumlah pengguna atau transaksi produksi.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 03: KEBUTUHAN PRODUK (WARM ROSE/PLUM EDITORIAL + BEFORE/AFTER TOGGLE) -->
+    <section class="slide" data-title="Tujuan dan pengguna" data-mode="light" data-bg="#f5ebe2" data-ink="#2d1f2d" data-soft="#544154" data-muted="#766376" data-accent="#8b3d6e" data-accent2="#127f72" data-card="rgba(255,255,255,0.8)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 02 · Kebutuhan produk</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Dari uang saku<br>ke <span class="serif-accent">alur terpantau.</span></h2>
+          <p class="head-desc">Produk menyatukan kebutuhan operasional yang sebelumnya tersebar pada pencatatan saldo, pembayaran, dan komunikasi.</p>
+        </div>
+        <div class="mode-switch stagger" style="--d:2" id="pain-toggle">
+          <button type="button" class="active" data-state="after">Sesudah PondokPay (Solusi)</button>
+          <button type="button" data-state="before">Sebelum PondokPay (Tantangan)</button>
+        </div>
+        <div class="grid g-3 stagger" style="--d:3" id="persona-cards">
+          <article class="card">
+            <div class="icon-box">⌂</div>
+            <h3>Pengelola pondok</h3>
+            <p data-after="Memantau santri, wali, kantin, pengguna, persetujuan, laporan, dan jejak perubahan dari satu area administrasi." data-before="Rekapitulasi uang saku tunai tersebar di buku catatan terpisah, menyulitkan audit mutasi dan pencairan dana kantin.">Memantau santri, wali, kantin, pengguna, persetujuan, laporan, dan jejak perubahan dari satu area administrasi.</p>
+          </article>
+          <article class="card">
+            <div class="icon-box">♡</div>
+            <h3>Orang tua / wali</h3>
+            <p data-after="Melihat saldo serta riwayat anak, menetapkan limit harian, mengisi saldo, dan mengatur notifikasi WhatsApp." data-before="Sulit mengetahui sisa uang saku anak secara real-time, mengontrol batas jajan harian, maupun mengonfirmasi transfer top-up.">Melihat saldo serta riwayat anak, menetapkan limit harian, mengisi saldo, dan mengatur notifikasi WhatsApp.</p>
+          </article>
+          <article class="card">
+            <div class="icon-box">▣</div>
+            <h3>Kasir kantin</h3>
+            <p data-after="Mencari santri, memasukkan pembelian, memvalidasi saldo dan limit, lalu menyimpan transaksi secara tercatat." data-before="Antrean panjang saat jam istirahat karena kembalian uang tunai, risiko salah hitung, dan pencatatan utang manual.">Mencari santri, memasukkan pembelian, memvalidasi saldo dan limit, lalu menyimpan transaksi secara tercatat.</p>
+          </article>
+        </div>
+        <div class="callout stagger" style="--d:4">
+          <span>💡</span>
+          <span>Akun santri tercatat dalam model data, tetapi aplikasi web saat ini belum menyediakan area khusus untuk role santri.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 04: ARSITEKTUR APLIKASI (TEAL LAB + INTERACTIVE DATA PACKET SIMULATOR) -->
+    <section class="slide" data-title="Arsitektur aplikasi" data-mode="dark" data-bg="#07191a" data-ink="#ecfdf5" data-soft="#a7f3d0" data-muted="#6ee7b7" data-accent="#2dd4bf" data-accent2="#cbff63" data-card="rgba(12,35,36,0.75)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 03 · Arsitektur (Klik Node / Simulasi Alur)</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Ringkas di depan.<br><span class="serif-accent">Terpisah di belakang.</span></h2>
+          <p class="head-desc">Frontend dan API dipisahkan agar pengalaman pengguna, aturan bisnis, serta penyimpanan data punya tanggung jawab yang jelas.</p>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" class="stagger" style="--d:2">
+          <button type="button" class="pill-btn active" data-flow-scenario="pos">Alur 1: Belanja Kasir + Notif WA</button>
+          <button type="button" class="pill-btn" data-flow-scenario="topup">Alur 2: Top-up QRIS Midtrans</button>
+          <button type="button" class="pill-btn" data-flow-scenario="wali">Alur 3: Cek Saldo & Limit Wali</button>
+        </div>
+
+        <div class="arch-flow-grid stagger" style="--d:3">
+          <button type="button" class="arch-node active-node" data-nid="0">
+            <div class="icon-box" style="margin:0 auto 10px;">◉</div>
+            <strong>Browser / PWA</strong>
+            <small style="color:var(--ink-muted);display:block;font-size:11px;">React, route per peran<br>HTTPS</small>
+          </button>
+          <div class="wire"><div class="wire-packet"></div></div>
+          <button type="button" class="arch-node" data-nid="1">
+            <div class="icon-box" style="margin:0 auto 10px;">⇄</div>
+            <strong>Nginx</strong>
+            <small style="color:var(--ink-muted);display:block;font-size:11px;">Static frontend<br>reverse proxy /api</small>
+          </button>
+          <div class="wire"><div class="wire-packet" style="animation-delay:.3s"></div></div>
+          <button type="button" class="arch-node" data-nid="2">
+            <div class="icon-box" style="margin:0 auto 10px;">⌘</div>
+            <strong>Node.js API</strong>
+            <small style="color:var(--ink-muted);display:block;font-size:11px;">Express, autentikasi<br>aturan bisnis</small>
+          </button>
+          <div class="wire"><div class="wire-packet" style="animation-delay:.6s"></div></div>
+          <button type="button" class="arch-node" data-nid="3">
+            <div class="icon-box" style="margin:0 auto 10px;">▤</div>
+            <strong>MySQL</strong>
+            <small style="color:var(--ink-muted);display:block;font-size:11px;">InnoDB, relasi<br>ledger & audit</small>
+          </button>
+        </div>
+
+        <div class="arch-telemetry stagger" style="--d:4">
+          <div class="grid g-3">
+            <article class="card" style="padding:15px;"><h3 style="color:var(--accent);font-size:14px;">Midtrans</h3><p style="font-size:12px;">Integrasi top-up daring dan pencocokan status pembayaran.</p></article>
+            <article class="card" style="padding:15px;"><h3 style="color:var(--amber);font-size:14px;">WhatsApp</h3><p style="font-size:12px;">Antrean notifikasi transaksi dan pengiriman ulang terkelola.</p></article>
+            <article class="card" style="padding:15px;"><h3 style="color:var(--accent-2);font-size:14px;">Perangkat</h3><p style="font-size:12px;">Dukungan kredensial RFID dan fingerprint pada alur identifikasi.</p></article>
+          </div>
+          <pre class="json-box" id="arch-json">{
+  "flow": "POST /api/kasir/sales",
+  "headers": { "Authorization": "Bearer JWT", "Idempotency-Key": "uuid-v4" },
+  "pipeline": ["Nginx Proxy", "Express Auth & Limit Check", "MySQL ACID Ledger", "WA Outbox"]
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 05: TUMPUKAN TEKNOLOGI (MIDNIGHT INDIGO) -->
+    <section class="slide" data-title="Teknologi" data-mode="dark" data-bg="#0f1328" data-ink="#f1f2ff" data-soft="#d2d4f0" data-muted="#979bc2" data-accent="#c2a8ff" data-accent2="#77dcdf" data-card="rgba(25,30,62,0.72)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 04 · Tumpukan teknologi</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Teknologi yang<br><span class="serif-accent">dipakai proyek.</span></h2>
+          <p class="head-desc">Dirangkum dari manifest frontend/backend dan struktur layanan proyek.</p>
+        </div>
+        <div class="filter-row stagger" style="--d:2" id="stack-filter">
+          <button type="button" class="pill-btn active" data-scat="all">Semua (9)</button>
+          <button type="button" class="pill-btn" data-scat="fe">Frontend (4)</button>
+          <button type="button" class="pill-btn" data-scat="be">Backend & DB (3)</button>
+          <button type="button" class="pill-btn" data-scat="ext">Notifikasi & Laporan (2)</button>
+        </div>
+        <div class="grid g-3 stagger" style="--d:3" id="stack-grid">
+          <div class="tech-card" data-scat="fe"><span class="tech-badge">Re</span><div><strong>React 18</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">UI berbasis komponen</small></div></div>
+          <div class="tech-card" data-scat="fe"><span class="tech-badge">V</span><div><strong>Vite 6</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">Dev server & build</small></div></div>
+          <div class="tech-card" data-scat="fe"><span class="tech-badge">R</span><div><strong>React Router 7</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">Navigasi per role</small></div></div>
+          <div class="tech-card" data-scat="fe"><span class="tech-badge">TW</span><div><strong>Tailwind CSS 4</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">Styling antarmuka</small></div></div>
+          <div class="tech-card" data-scat="be"><span class="tech-badge">N</span><div><strong>Node.js + Express 5</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">REST API, ES modules</small></div></div>
+          <div class="tech-card" data-scat="be"><span class="tech-badge">SQL</span><div><strong>MySQL + mysql2</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">Penyimpanan relasional</small></div></div>
+          <div class="tech-card" data-scat="be"><span class="tech-badge">JWT</span><div><strong>JWT + bcryptjs</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">Sesi & hash kata sandi</small></div></div>
+          <div class="tech-card" data-scat="ext"><span class="tech-badge">WA</span><div><strong>Baileys + QR</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">Integrasi notifikasi WhatsApp</small></div></div>
+          <div class="tech-card" data-scat="ext"><span class="tech-badge">PDF</span><div><strong>PDFKit</strong><small style="display:block;color:var(--ink-muted);font-size:11.5px;">Pembuatan dokumen laporan</small></div></div>
+        </div>
+        <div class="callout stagger" style="--d:4">
+          <span>📦</span>
+          <span>Versi teknologi ditulis sesuai dependency manifest proyek; detail patch dapat berubah mengikuti lockfile.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 06: STRUKTUR DATABASE (NORDIC SLATE LIGHT + INTERACTIVE ERD INSPECTOR) -->
+    <section class="slide" data-title="Struktur database" data-mode="light" data-bg="#e9f0f6" data-ink="#162d47" data-soft="#3a5573" data-muted="#5b738e" data-accent="#1c6daf" data-accent2="#278b85" data-card="rgba(255,255,255,0.88)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 05 · Model data (Klik Tabel untuk Sorot Relasi & Kolom)</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Relasi inti <span class="serif-accent">PondokPay.</span></h2>
+          <p class="head-desc">Gambaran domain, bukan ERD setiap kolom. Relasi akun, santri, transaksi, kantin, pembayaran, dan notifikasi membentuk alur utama.</p>
+        </div>
+        <div class="erd-layout stagger" style="--d:2">
+          <div class="erd-col">
+            <button type="button" class="tbl-btn" data-t="users" data-links="wali_santri,kantin,transaksi" data-cols="id (PK), name, email, password_hash, role [admin|kasir|wali], status"><code>users</code><small>Akun dan role admin / kasir / wali</small></button>
+            <button type="button" class="tbl-btn" data-t="wali_santri" data-links="users,santri" data-cols="id (PK), wali_user_id (FK -> users), santri_id (FK -> santri), relation_type"><code>wali_santri</code><small>Penghubung orang tua dan santri</small></button>
+            <button type="button" class="tbl-btn" data-t="credentials_auth" data-links="santri" data-cols="id (PK), santri_id (FK -> santri), type [rfid|fingerprint], credential_uid, is_active"><code>credentials_auth</code><small>RFID / fingerprint santri</small></button>
+            <button type="button" class="tbl-btn" data-t="parent_notification_settings" data-links="users,whatsapp_notification_outbox" data-cols="id (PK), wali_user_id (FK), whatsapp_number, is_verified, notify_on_trx"><code>parent_notification_settings</code><small>Nomor dan verifikasi WhatsApp</small></button>
+          </div>
+          <div class="erd-col">
+            <button type="button" class="tbl-btn selected" data-t="santri" data-links="wali_santri,credentials_auth,transaksi,midtrans_topup_payments" data-cols="id (PK), nis, full_name, balance, daily_limit, status"><code>santri</code><small>Profil, saldo, limit harian, status</small></button>
+            <div style="text-align:center;font-family:var(--font-mono);font-size:10.5px;color:var(--accent-2);font-weight:700;">santri_id · kantin_id · user_id</div>
+            <button type="button" class="tbl-btn" data-t="transaksi" data-links="santri,users,kantin_transaksi,midtrans_topup_payments,whatsapp_notification_outbox" data-cols="id (PK), santri_id (FK), type [topup|belanja|tarik|biaya], amount, balance_after, idempotency_key, created_at"><code>transaksi</code><small>Ledger utama top-up / belanja / tarik / biaya</small></button>
+            <div style="text-align:center;font-family:var(--font-mono);font-size:10.5px;color:var(--accent-2);font-weight:700;">transaksi_id · product_id · FK</div>
+            <button type="button" class="tbl-btn" data-t="kantin_transaksi" data-links="transaksi,kantin" data-cols="id (PK), kantin_id (FK), transaksi_id (FK), entry_type [sale|payout], amount, balance_after"><code>kantin_transaksi</code><small>Ledger saldo penjualan / pencairan kantin</small></button>
+          </div>
+          <div class="erd-col">
+            <button type="button" class="tbl-btn" data-t="kantin" data-links="users,kantin_transaksi,canteen_products" data-cols="id (PK), name, balance, is_active | kantin_kasir: kantin_id, kasir_user_id"><code>kantin · kantin_kasir</code><small>Unit kantin dan penugasan kasir</small></button>
+            <button type="button" class="tbl-btn" data-t="canteen_products" data-links="kantin,transaksi" data-cols="id (PK), kantin_id (FK), name, price, stock | canteen_sale_items: transaksi_id, product_id, qty, subtotal"><code>canteen_products · canteen_sale_items</code><small>Katalog dan rincian produk penjualan</small></button>
+            <button type="button" class="tbl-btn" data-t="midtrans_topup_payments" data-links="santri,transaksi" data-cols="id (PK), order_id, santri_id (FK), transaksi_id (FK), gross_amount, status [pending|paid|expired|failed]"><code>midtrans_topup_payments</code><small>Status pembayaran dan kaitan ledger</small></button>
+            <button type="button" class="tbl-btn" data-t="whatsapp_notification_outbox" data-links="transaksi,parent_notification_settings" data-cols="id (PK), transaksi_id (FK), target_phone, status [queued|sent|failed], retry_count, scheduled_at"><code>whatsapp_notification_outbox</code><small>Antrean pengiriman notifikasi</small></button>
+          </div>
+        </div>
+        <div class="erd-inspector stagger" style="--d:3">
+          <div><strong style="color:var(--accent);font-family:var(--font-mono);" id="erd-tbl-name">santri:</strong> <span id="erd-tbl-cols" style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);">id (PK), nis, full_name, balance, daily_limit, status</span></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="eyebrow" style="margin:0;font-size:9.5px;">Foreign key</span>
+            <span class="eyebrow" style="margin:0;font-size:9.5px;">Idempotency key</span>
+            <span class="eyebrow" style="margin:0;font-size:9.5px;">Saldo akhir tersimpan</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 07: DOMAIN DATABASE (WARM OLIVE/SAND LIGHT) -->
+    <section class="slide" data-title="Domain database" data-mode="light" data-bg="#f1efde" data-ink="#2e2d1e" data-soft="#504f3b" data-muted="#6e6d58" data-accent="#687f28" data-accent2="#267c71" data-card="rgba(255,255,255,0.82)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 06 · Cakupan database</span>
+        <h2 class="stagger" style="--d:1">Bukan cuma <span class="serif-accent">tabel transaksi.</span></h2>
+        <div class="grid g-3 stagger" style="--d:2; margin-top:20px;">
+          <article class="card"><div class="icon-box">01</div><h3>Akun & hubungan</h3><p><code>users</code>, <code>santri</code>, <code>wali_santri</code>, <code>kantin_kasir</code>, dan <code>credentials_auth</code>.</p></article>
+          <article class="card"><div class="icon-box">02</div><h3>Ledger & pembayaran</h3><p><code>transaksi</code>, <code>kantin_transaksi</code>, <code>midtrans_topup_payments</code>, serta kunci idempotensi.</p></article>
+          <article class="card"><div class="icon-box">03</div><h3>Operasional kantin</h3><p><code>canteen_products</code>, <code>canteen_sale_items</code>, <code>canteen_stock_movements</code>, dan <code>canteen_payout_approvals</code>.</p></article>
+          <article class="card"><div class="icon-box">04</div><h3>Keuangan & kontrol</h3><p><code>admin_cash_entries</code>, <code>service_fee_rates</code>, <code>service_fee_charges</code>, dan <code>financial_approvals</code>.</p></article>
+          <article class="card"><div class="icon-box">05</div><h3>Komunikasi & konfigurasi</h3><p><code>institution_settings</code>, <code>parent_notification_settings</code>, dan outbox WhatsApp.</p></article>
+          <article class="card"><div class="icon-box">06</div><h3>Jejak & proteksi</h3><p><code>audit_logs</code> menyimpan jejak perubahan; <code>security_rate_limits</code> membantu membatasi percobaan.</p></article>
+        </div>
+        <div class="callout stagger" style="--d:3">
+          <span>🗄️</span>
+          <span>Struktur tabel tambahan diinisialisasi oleh skrip SQL dan migrasi aplikasi. Nama tabel di kelompok operasional diringkas per domain.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 08: KEAMANAN & INTEGRITAS (DEEP EMERALD + SECURITY STRESS TEST MINI) -->
+    <section class="slide" data-title="Keamanan" data-mode="dark" data-bg="#0b2420" data-ink="#eef8f2" data-soft="#cde3d8" data-muted="#97b5a8" data-accent="#aef17d" data-accent2="#63dcc1" data-card="rgba(22,54,48,0.68)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 07 · Keamanan dan integritas</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Aman sejak <span class="serif-accent">alur dirancang.</span></h2>
+          <p class="head-desc">Kontrol keamanan diterapkan berlapis. Peran membatasi fitur, aturan server memvalidasi keputusan penting.</p>
+        </div>
+        <div class="grid g-3 stagger" style="--d:2">
+          <article class="card"><div class="icon-box">◈</div><h3>Akses sesuai peran</h3><p>Route dan endpoint memeriksa identitas serta otorisasi pengguna.</p></article>
+          <article class="card"><div class="icon-box">⌑</div><h3>Kredensial terlindungi</h3><p>Kata sandi di-hash; token mengamankan request API; konfigurasi sensitif tidak ditampilkan dalam UI.</p></article>
+          <article class="card"><div class="icon-box">↻</div><h3>Transaksi idempoten</h3><p>Kunci idempotensi mencegah pengulangan operasi ketika request dikirim ulang.</p></article>
+          <article class="card"><div class="icon-box">✓</div><h3>Persetujuan finansial</h3><p>Operasi sensitif melewati alur persetujuan dan verifikasi tambahan sesuai kebijakan aplikasi.</p></article>
+          <article class="card"><div class="icon-box">◎</div><h3>Jejak audit</h3><p>Perubahan penting memiliki jejak aktivitas untuk membantu pemeriksaan.</p></article>
+          <article class="card"><div class="icon-box">↗</div><h3>HTTPS & pembatasan</h3><p>Domain publik menggunakan TLS; rate limit dan validasi request menambah lapisan proteksi.</p></article>
+        </div>
+        <div class="sec-lab stagger" style="--d:3">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <strong style="font-size:12.5px;margin-right:4px;">Uji Pertahanan Server:</strong>
+            <button type="button" class="pill-btn" data-sec="HTTP 409 Conflict · Idempotency-Key 'tx-991' sudah diproses. Saldo aman dari double-debit.">Uji Double-Request</button>
+            <button type="button" class="pill-btn" data-sec="HTTP 403 Forbidden · Role 'kasir' ditolak mengakses endpoint /api/admin/approvals.">Uji Akses Ilegal</button>
+            <button type="button" class="pill-btn" data-sec="HTTP 429 Too Many Requests · Rate limiter aktif memblokir percobaan login berulang.">Uji Brute-Force</button>
+          </div>
+          <div class="sec-result" id="sec-output">Pilih simulasi pertahanan untuk melihat respons API</div>
+        </div>
+        <div class="callout stagger" style="--d:4">
+          <span>🔒</span>
+          <span>Presentasi tidak menampilkan rahasia, nomor, data pribadi, ataupun transaksi aktual dari sistem produksi.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 09: MENU ADMIN (ROYAL PLUM + LIVE WIREFRAME INSPECTOR) -->
+    <section class="slide" data-title="Menu admin" data-mode="dark" data-bg="#1b1429" data-ink="#fdf7ff" data-soft="#dfd3eb" data-muted="#b1a1c4" data-accent="#dbb8ff" data-accent2="#98e3cf" data-card="rgba(39,29,58,0.72)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 08 · Admin pondok</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Pusat kendali <span class="serif-accent">operasional.</span></h2>
+          <p class="head-desc">Implementasi memakai role <code>admin</code>. Tidak ada role bernama “super admin” yang terpisah di kode.</p>
+        </div>
+        <div class="role-workbench stagger" style="--d:2">
+          <div class="menu-cards">
+            <button type="button" class="m-card active" data-awf="Ringkasan|/admin|Menampilkan metrik saldo beredar, jumlah santri aktif, dan grafik transaksi harian."><div><div class="m-num">01</div><strong>Ringkasan</strong><small>Ikhtisar saldo, santri, kantin, dan aktivitas terbaru.</small></div><span class="m-route">/admin</span></button>
+            <button type="button" class="m-card" data-awf="Data santri|/admin/santri|Tabel data santri, status aktif, saldo terkini, limit harian, serta halaman detail santri."><div><div class="m-num">02</div><strong>Data santri</strong><small>Kelola profil, status, saldo, dan limit harian.</small></div><span class="m-route">/admin/santri</span></button>
+            <button type="button" class="m-card" data-awf="Kantin & kasir|/admin/kantin|Daftar unit kantin, saldo pendapatan kantin, dan penugasan akun petugas kasir."><div><div class="m-num">03</div><strong>Kantin & kasir</strong><small>Kelola unit kantin serta kasir yang ditugaskan.</small></div><span class="m-route">/admin/kantin</span></button>
+            <button type="button" class="m-card" data-awf="Orang tua / wali|/admin/wali|Direktori akun wali santri dan pengelolaan relasi ke satu atau beberapa anak."><div><div class="m-num">04</div><strong>Orang tua / wali</strong><small>Kelola akun wali dan hubungan ke santri.</small></div><span class="m-route">/admin/wali</span></button>
+            <button type="button" class="m-card" data-awf="Transaksi|/admin/transaksi|Buku besar ledger transaksi top-up, belanja kantin, tarik saldo, dan biaya layanan."><div><div class="m-num">05</div><strong>Transaksi</strong><small>Telusuri ledger dan detail aktivitas keuangan.</small></div><span class="m-route">/admin/transaksi</span></button>
+            <button type="button" class="m-card" data-awf="Laporan finansial|/admin/reports/financial|Rekapitulasi arus kas periodik dan generator dokumen laporan berbasis PDFKit."><div><div class="m-num">06</div><strong>Laporan finansial</strong><small>Ringkasan dan laporan transaksi untuk pemantauan.</small></div><span class="m-route">/admin/reports/financial</span></button>
+            <button type="button" class="m-card" data-awf="Pengaturan pondok|/admin/settings|Konfigurasi identitas lembaga, tarif biaya layanan, serta integrasi Midtrans & WhatsApp."><div><div class="m-num">07</div><strong>Pengaturan pondok</strong><small>Identitas, konfigurasi layanan dan integrasi.</small></div><span class="m-route">/admin/settings</span></button>
+            <button type="button" class="m-card" data-awf="Kas admin|/admin/cash|Pencatatan mutasi kas operasional pengelola pondok secara terpisah dari saldo santri."><div><div class="m-num">08</div><strong>Kas admin</strong><small>Kelola pemasukan, pengeluaran, dan koreksi kas.</small></div><span class="m-route">/admin/cash</span></button>
+            <button type="button" class="m-card" data-awf="Akun pengguna|/admin/users|Manajemen kredensial login dan pembagian hak akses role admin, kasir, dan wali."><div><div class="m-num">09</div><strong>Akun pengguna</strong><small>Kelola akun dan role pengguna sistem.</small></div><span class="m-route">/admin/users</span></button>
+            <button type="button" class="m-card" data-awf="Kredensial|/admin/credentials|Aktivasi maupun pemblokiran kartu RFID dan data biometrik fingerprint santri."><div><div class="m-num">10</div><strong>Kredensial</strong><small>Kelola status pengenal RFID / fingerprint.</small></div><span class="m-route">/admin/credentials</span></button>
+            <button type="button" class="m-card" data-awf="Persetujuan finansial|/admin/approvals|Antrean verifikasi pencairan saldo kantin dan operasi finansial sensitif."><div><div class="m-num">11</div><strong>Persetujuan finansial</strong><small>Review permintaan transaksi yang perlu persetujuan.</small></div><span class="m-route">/admin/approvals</span></button>
+            <button type="button" class="m-card" data-awf="Log audit|/admin/audit|Jejak kronologis perubahan data penting beserta aktor dan waktu eksekusinya."><div><div class="m-num">12</div><strong>Log audit</strong><small>Telusuri tindakan dan perubahan penting.</small></div><span class="m-route">/admin/audit</span></button>
+          </div>
+          <aside class="wireframe-preview">
+            <span class="eyebrow" style="margin-bottom:8px;">Inspektor Fitur Admin</span>
+            <h3 id="awf-title" style="font-size:18px;">Ringkasan</h3>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent-2);" id="awf-route">/admin</div>
+            <div class="wf-screen">
+              <p id="awf-desc" style="color:var(--ink-soft);line-height:1.6;">Menampilkan metrik saldo beredar, jumlah santri aktif, dan grafik transaksi harian.</p>
+              <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--ink-muted);">
+                Detail santri juga tersedia sebagai halaman lanjutan dari daftar santri, misalnya untuk melihat data dan transaksi santri tertentu.
+              </div>
+            </div>
+            <button type="button" class="btn-secondary" style="width:100%;justify-content:center;margin-top:12px;" onclick="goToSlide(9)">Buka Galeri 7 Layar Admin →</button>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: SCREENSHOT ADMIN -->
+    <section class="slide" data-title="Screenshot admin" data-mode="dark" data-bg="#101b22" data-ink="#edf5f5" data-soft="#cfe0e3" data-muted="#97b0b5" data-accent="#87e2cc" data-accent2="#8db9ff" data-card="rgba(22,36,45,0.75)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 09 · Galeri layar admin (7 Layar Desain)</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Admin, <span class="serif-accent">lebih terarah.</span></h2>
+          <p class="head-desc">Cuplikan layar rancangan UI admin yang tersedia di repositori. Klik gambar untuk melihat resolusi lebih besar.</p>
+        </div>
+        <div class="gal-grid stagger" style="--d:2" data-gallery="admin"></div>
+        <p style="margin-top:12px;font-size:11px;color:var(--ink-muted);">Gambar adalah aset desain UI dengan data contoh; bukan screenshot sesi produksi yang tervalidasi.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 11: MENU WALI (WARM PEACH/ROSE LIGHT) -->
+    <section class="slide" data-title="Menu wali" data-mode="light" data-bg="#faece4" data-ink="#39212a" data-soft="#5e3e4a" data-muted="#805e6a" data-accent="#a64958" data-accent2="#2c7a72" data-card="rgba(255,255,255,0.85)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 10 · Orang tua / wali</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Transparan untuk <span class="serif-accent">keluarga.</span></h2>
+          <p class="head-desc">Wali melihat informasi anak yang terhubung ke akunnya dan dapat mengelola kontrol uang saku.</p>
+        </div>
+        <div class="role-workbench stagger" style="--d:2">
+          <div class="menu-cards cols-2">
+            <button type="button" class="m-card active" data-wwf="Beranda|/wali|Menampilkan kartu saldo aktif santri, pemakaian limit hari ini, serta ringkasan transaksi terbaru."><div><div class="m-num">01</div><strong>Beranda</strong><small>Saldo anak, aktivitas terakhir, dan ringkasan pemakaian.</small></div><span class="m-route">/wali</span></button>
+            <button type="button" class="m-card" data-wwf="Riwayat transaksi|/wali/history|Daftar mutasi lengkap dengan filter tanggal serta rincian barang yang dibeli anak di kantin."><div><div class="m-num">02</div><strong>Riwayat transaksi</strong><small>Daftar transaksi, filter periode, serta rincian pembelian.</small></div><span class="m-route">/wali/history</span></button>
+            <button type="button" class="m-card" data-wwf="Limit harian|/wali/limit|Pengaturan batas maksimal pengeluaran harian santri yang langsung berlaku pada kasir kantin."><div><div class="m-num">03</div><strong>Limit harian</strong><small>Atur batas belanja harian untuk santri yang terhubung.</small></div><span class="m-route">/wali/limit</span></button>
+            <button type="button" class="m-card" data-wwf="Top-up|/wali/topup|Pengisian saldo nontunai melalui alur pembayaran yang terhubung dengan status real-time."><div><div class="m-num">04</div><strong>Top-up</strong><small>Isi saldo melalui alur pembayaran yang tersedia.</small></div><span class="m-route">/wali/topup</span></button>
+            <button type="button" class="m-card" data-wwf="Akun & WhatsApp|/wali/account|Pengelolaan nomor WhatsApp wali, proses verifikasi, dan preferensi notifikasi transaksi anak."><div><div class="m-num">05</div><strong>Akun & WhatsApp</strong><small>Kelola profil, nomor WhatsApp, verifikasi, dan notifikasi.</small></div><span class="m-route">/wali/account</span></button>
+            <button type="button" class="m-card" data-wwf="Multi-santri|wali_santri → santri|Kemudahan berpindah profil antar anak dalam satu akun orang tua apabila memiliki lebih dari satu santri."><div><div class="m-num">+</div><strong>Multi-santri</strong><small>Berpindah antar anak yang telah dihubungkan ke akun wali.</small></div><span class="m-route">wali_santri → santri</span></button>
+          </div>
+          <aside class="wireframe-preview">
+            <span class="eyebrow" style="margin-bottom:8px;">Inspektor Fitur Wali</span>
+            <h3 id="wwf-title" style="font-size:18px;">Beranda</h3>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent-2);" id="wwf-route">/wali</div>
+            <div class="wf-screen">
+              <p id="wwf-desc" style="color:var(--ink-soft);line-height:1.6;">Menampilkan kartu saldo aktif santri, pemakaian limit hari ini, serta ringkasan transaksi terbaru.</p>
+              <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--ink-muted);">
+                Informasi rekening/pembayaran yang tampil bergantung pada konfigurasi pondok dan status integrasi payment gateway.
+              </div>
+            </div>
+            <button type="button" class="btn-secondary" style="width:100%;justify-content:center;margin-top:12px;" onclick="goToSlide(11)">Buka Galeri 3 Layar Wali →</button>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 12: SCREENSHOT WALI -->
+    <section class="slide" data-title="Screenshot wali" data-mode="dark" data-bg="#1d2632" data-ink="#f1f5fb" data-soft="#d4dfed" data-muted="#9eb0c4" data-accent="#e7c77f" data-accent2="#a6decd" data-card="rgba(35,46,61,0.75)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 11 · Galeri layar wali (3 Layar Desain)</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Orang tua, <span class="serif-accent">tetap terhubung.</span></h2>
+          <p class="head-desc">Desain berfokus pada saldo anak, transparansi transaksi, dan kontrol batas belanja.</p>
+        </div>
+        <div class="gal-grid cols-3 stagger" style="--d:2" data-gallery="wali"></div>
+        <p style="margin-top:12px;font-size:11px;color:var(--ink-muted);">Gambar adalah aset desain UI dengan data contoh; bukan screenshot sesi produksi yang tervalidasi.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 13: MENU KASIR (WARM ESPRESSO & AMBER) -->
+    <section class="slide" data-title="Menu kasir" data-mode="dark" data-bg="#1f1814" data-ink="#fff8ef" data-soft="#ead9c8" data-muted="#bda894" data-accent="#ffb451" data-accent2="#8dd9bc" data-card="rgba(44,33,27,0.74)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 12 · Kasir kantin</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Transaksi cepat, <span class="serif-accent">catatan rapi.</span></h2>
+          <p class="head-desc">Kasir bekerja pada kantin yang ditugaskan. Validasi transaksi tetap dilakukan oleh backend.</p>
+        </div>
+        <div class="role-workbench stagger" style="--d:2">
+          <div class="menu-cards cols-2">
+            <button type="button" class="m-card active" data-kwf="Beranda / transaksi|/kasir|Pencarian santri, pemilihan item produk kantin, pengecekan total belanja, dan pemrosesan pembayaran."><div><div class="m-num">01</div><strong>Beranda / transaksi</strong><small>Cari santri, pilih produk, cek ringkasan pembelian, dan proses pembayaran.</small></div><span class="m-route">/kasir</span></button>
+            <button type="button" class="m-card" data-kwf="Produk & stok|/kasir/catalog|Pengelolaan daftar barang dagangan kantin, harga jual, serta pencatatan mutasi keluar-masuk stok."><div><div class="m-num">02</div><strong>Produk & stok</strong><small>Kelola katalog, harga, stok, dan perubahan persediaan kantin.</small></div><span class="m-route">/kasir/catalog</span></button>
+            <button type="button" class="m-card" data-kwf="Riwayat|/kasir/history|Daftar penjualan yang telah dilakukan pada kantin terkait beserta detail item setiap transaksi."><div><div class="m-num">03</div><strong>Riwayat</strong><small>Lihat transaksi kantin sebelumnya dan rincian penjualan.</small></div><span class="m-route">/kasir/history</span></button>
+            <button type="button" class="m-card" data-kwf="Persetujuan pencairan|/kasir/payout-approvals|Peninjauan dan konfirmasi pencairan saldo hasil penjualan kantin sesuai kewenangan petugas."><div><div class="m-num">04</div><strong>Persetujuan pencairan</strong><small>Review dan konfirmasi pencairan saldo kantin sesuai hak akses.</small></div><span class="m-route">/kasir/payout-approvals</span></button>
+            <button type="button" class="m-card" data-kwf="Akun|/kasir/account|Informasi profil petugas kasir yang sedang login beserta unit kantin yang ditugaskan."><div><div class="m-num">05</div><strong>Akun</strong><small>Lihat profil serta kantin yang terhubung dengan akun.</small></div><span class="m-route">/kasir/account</span></button>
+            <button type="button" class="m-card" data-kwf="Penjualan aman|API validates · idempotent write|Validasi akses, kecukupan saldo, limit harian santri, dan pencatatan atomik di server."><div><div class="m-num">alur</div><strong>Penjualan aman</strong><small>Identifikasi santri, cek saldo & limit, catat ledger, lalu perbarui stok.</small></div><span class="m-route">API validates · idempotent write</span></button>
+          </div>
+          <aside class="wireframe-preview">
+            <span class="eyebrow" style="margin-bottom:8px;">Inspektor Fitur Kasir</span>
+            <h3 id="kwf-title" style="font-size:18px;">Beranda / transaksi</h3>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent-2);" id="kwf-route">/kasir</div>
+            <div class="wf-screen">
+              <p id="kwf-desc" style="color:var(--ink-soft);line-height:1.6;">Pencarian santri, pemilihan item produk kantin, pengecekan total belanja, dan pemrosesan pembayaran.</p>
+              <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--ink-muted);">
+                Pengenal RFID/fingerprint merupakan opsi identifikasi yang didukung oleh model kredensial proyek; ketersediaan perangkat bergantung pada instalasi.
+              </div>
+            </div>
+            <button type="button" class="btn-secondary" style="width:100%;justify-content:center;margin-top:12px;" onclick="goToSlide(13)">Buka Galeri 6 Layar Kasir →</button>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 14: SCREENSHOT KASIR -->
+    <section class="slide" data-title="Screenshot kasir" data-mode="light" data-bg="#f4ece0" data-ink="#33281b" data-soft="#574a38" data-muted="#786b58" data-accent="#bd692c" data-accent2="#2a7f75" data-card="rgba(255,255,255,0.85)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 13 · Galeri layar kasir (6 Layar Desain)</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Alur kasir <span class="serif-accent">dari awal ke selesai.</span></h2>
+          <p class="head-desc">Layar pencarian santri, input barang, verifikasi, konfirmasi, hasil, dan riwayat transaksi.</p>
+        </div>
+        <div class="gal-grid stagger" style="--d:2" data-gallery="kasir"></div>
+        <p style="margin-top:12px;font-size:11px;color:var(--ink-muted);">Gambar adalah aset desain UI dengan data contoh; bukan screenshot sesi produksi yang tervalidasi.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 15: SIKLUS TRANSAKSI + FULL INTERACTIVE POS & WALI LIMIT LAB -->
+    <section class="slide" data-title="Alur transaksi" data-mode="dark" data-bg="#091d1c" data-ink="#ecfdf5" data-soft="#c6f6d5" data-muted="#81e6d9" data-accent="#2dd4bf" data-accent2="#cbff63" data-card="rgba(14,38,37,0.78)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 14 · Siklus transaksi & Laboratorium Simulasi POS</span>
+        <h2 class="stagger" style="--d:1">Setiap pembayaran punya <span class="serif-accent">jejak.</span></h2>
+        <p class="lead stagger" style="--d:2; margin-bottom:12px;">Alur belanja menghubungkan validasi saldo santri dengan pencatatan saldo kantin—bukan sekadar mengurangi angka di layar.</p>
+
+        <div class="step-track stagger" style="--d:3">
+          <div class="step-node" data-step="0"><strong>1. Identifikasi</strong><br><span style="color:var(--ink-muted);font-size:10px;">Santri & kantin ditugaskan</span></div>
+          <div class="step-node" data-step="1"><strong>2. Susun belanja</strong><br><span style="color:var(--ink-muted);font-size:10px;">Produk, jumlah & total</span></div>
+          <div class="step-node" data-step="2"><strong>3. Validasi server</strong><br><span style="color:var(--ink-muted);font-size:10px;">Akses, saldo, limit & stok</span></div>
+          <div class="step-node" data-step="3"><strong>4. Catat ledger</strong><br><span style="color:var(--ink-muted);font-size:10px;">Santri & kantin terkait</span></div>
+          <div class="step-node" data-step="4"><strong>5. Konfirmasi</strong><br><span style="color:var(--ink-muted);font-size:10px;">Status & notifikasi wali</span></div>
+        </div>
+
+        <div class="pos-lab stagger" style="--d:4">
+          <div class="card" style="padding:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <strong style="font-size:14px;">Pilih Santri & Atur Limit Wali</strong>
+              <div style="display:flex;gap:6px;">
+                <button type="button" class="santri-chip active" data-sname="Ahmad Fauzan" data-sbal="45000">Ahmad (45rb)</button>
+                <button type="button" class="santri-chip" data-sname="Siti Aisyah" data-sbal="15000">Aisyah (15rb)</button>
+              </div>
+            </div>
+            <div class="grid g-2" style="gap:10px;margin-bottom:10px;">
+              <div style="padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--border);">
+                <small style="color:var(--ink-muted);display:block;font-size:10.5px;">Saldo Santri (<span id="pos-sname">Ahmad Fauzan</span>)</small>
+                <strong id="pos-sbal" style="font-size:17px;color:var(--accent-2);">Rp 45.000</strong>
+              </div>
+              <div style="padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--border);">
+                <small style="color:var(--ink-muted);display:block;font-size:10.5px;">Saldo Kantin Utama</small>
+                <strong id="pos-kbal" style="font-size:17px;color:var(--accent);">Rp 150.000</strong>
+              </div>
+            </div>
+            <div style="margin-bottom:10px;font-size:12px;">
+              <div style="display:flex;justify-content:space-between;">
+                <span>Limit Harian (Kontrol Wali):</span>
+                <strong id="pos-limit-lbl" style="color:var(--amber);">Rp 25.000</strong>
+              </div>
+              <input type="range" id="pos-limit-range" min="5000" max="50000" step="5000" value="25000" style="width:100%;accent-color:var(--accent);margin-top:4px;cursor:pointer;">
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+              <button type="button" class="snack-btn" data-p="12000" data-n="Nasi Ayam">+ Nasi Ayam (12rb)</button>
+              <button type="button" class="snack-btn" data-p="5000" data-n="Es Teh">+ Es Teh (5rb)</button>
+              <button type="button" class="snack-btn" data-p="10000" data-n="Roti Bakar">+ Roti Bakar (10rb)</button>
+              <button type="button" class="snack-btn" data-p="3000" data-n="Air Mineral">+ Air Mineral (3rb)</button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <div style="font-size:12.5px;">Total: <strong id="pos-cart-tot" style="color:var(--accent-2);">Rp 17.000</strong> <small id="pos-cart-list" style="color:var(--ink-muted);">(Nasi Ayam, Es Teh)</small></div>
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="btn-secondary" style="padding:8px 13px;font-size:12px;" id="pos-clear">Reset</button>
+                <button type="button" class="btn-primary" style="padding:9px 15px;font-size:12px;" id="pos-submit">▶ Jalankan Simulasi</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;justify-content:space-between;gap:10px;">
+            <div class="sim-terminal" id="pos-log">
+              [SIMULATOR SIAP] Klik "Jalankan Simulasi" untuk menguji alur 5 tahap transaksi.<br>
+              • Coba turunkan slider Limit Harian di bawah total belanja untuk menguji penolakan limit.<br>
+              • Atau pilih "Aisyah (15rb)" untuk menguji validasi saldo tidak mencukupi.
+            </div>
+            <div class="grid g-3" style="gap:8px;">
+              <div class="card" style="padding:11px;"><h3 style="font-size:13px;color:var(--accent-2);">Saldo santri</h3><p style="font-size:11px;">Nilai saldo akhir transaksi disimpan dalam ledger.</p></div>
+              <div class="card" style="padding:11px;"><h3 style="font-size:13px;color:var(--accent);">Saldo kantin</h3><p style="font-size:11px;">Penjualan tercatat pada ledger kantin yang terhubung.</p></div>
+              <div class="card" style="padding:11px;"><h3 style="font-size:13px;color:var(--amber);">Konsistensi</h3><p style="font-size:11px;">Operasi finansial memakai transaksi database dan aturan server.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 16: INTEGRASI LAYANAN -->
+    <section class="slide" data-title="Integrasi" data-mode="dark" data-bg="#1b152d" data-ink="#f5f0ff" data-soft="#ded6f2" data-muted="#b3a7cf" data-accent="#d0a6ff" data-accent2="#73e5d2" data-card="rgba(37,29,61,0.74)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 15 · Integrasi layanan</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Lebih dari <span class="serif-accent">pencatatan kantin.</span></h2>
+          <p class="head-desc">Beberapa layanan tambahan mendukung perjalanan saldo dan komunikasi wali.</p>
+        </div>
+        <div class="grid g-3 stagger" style="--d:2">
+          <article class="card">
+            <div class="icon-box">QR</div>
+            <h3>Top-up via Midtrans</h3>
+            <p>Intent pembayaran, status pending/paid/expired/failed, dan pengaitan pembayaran dengan ledger top-up.</p>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+              <span class="eyebrow" style="margin:0;font-size:9.5px;">QRIS / kanal aktif</span>
+              <span class="eyebrow" style="margin:0;font-size:9.5px;">Idempotensi</span>
+            </div>
+          </article>
+          <article class="card">
+            <div class="icon-box">WA</div>
+            <h3>Notifikasi WhatsApp</h3>
+            <p>Nomor wali perlu dikonfigurasi dan diverifikasi. Outbox mengelola status, percobaan, dan jadwal kirim.</p>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+              <span class="eyebrow" style="margin:0;font-size:9.5px;">Opt-in</span>
+              <span class="eyebrow" style="margin:0;font-size:9.5px;">Retry terkelola</span>
+            </div>
+          </article>
+          <article class="card">
+            <div class="icon-box">PDF</div>
+            <h3>Dokumen laporan</h3>
+            <p>Data laporan dapat disiapkan untuk kebutuhan pemantauan dan ekspor dokumen.</p>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+              <span class="eyebrow" style="margin:0;font-size:9.5px;">PDFKit</span>
+              <span class="eyebrow" style="margin:0;font-size:9.5px;">Laporan finansial</span>
+            </div>
+          </article>
+        </div>
+        <div class="callout stagger" style="--d:3">
+          <span>⚙️</span>
+          <span>Ketersediaan kanal pembayaran, kredensial Midtrans, dan sesi WhatsApp mengikuti konfigurasi lingkungan deployment.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 17: INFRASTRUKTUR & DEPLOYMENT (INTERACTIVE TERMINAL) -->
+    <section class="slide" data-title="Infrastruktur" data-mode="dark" data-bg="#0b1310" data-ink="#e7f2ea" data-soft="#c3d7c9" data-muted="#8fa897" data-accent="#86efac" data-accent2="#2dd4bf" data-card="rgba(18,30,25,0.75)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 16 · Deployment (Klik Perintah Terminal)</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Berjalan di <span class="serif-accent">domain publik.</span></h2>
+          <p class="head-desc">Deployment yang telah disiapkan menggunakan VPS Linux dengan service backend terkelola.</p>
+        </div>
+        <div class="grid g-2 stagger" style="--d:2">
+          <div class="vps-box">
+            <div class="vps-cmd-row">
+              <button type="button" class="vps-cmd-btn active" data-cmd="tree">tree architecture</button>
+              <button type="button" class="vps-cmd-btn" data-cmd="tls">curl -I https</button>
+              <button type="button" class="vps-cmd-btn" data-cmd="sys">systemctl status</button>
+              <button type="button" class="vps-cmd-btn" data-cmd="db">mysql backup</button>
+            </div>
+            <div id="vps-output" style="font-size:12.5px;line-height:2;">
+              <strong style="color:#86efac;">pondokpay.rubaya.tech</strong><br>
+              ├── <span style="color:#2dd4bf;">HTTPS</span> · Let's Encrypt<br>
+              ├── <span style="color:#2dd4bf;">Nginx</span> · reverse proxy<br>
+              ├── <span style="color:#2dd4bf;">Node.js</span> · systemd service<br>
+              └── <span style="color:#2dd4bf;">MySQL</span> · relational database
+            </div>
+          </div>
+          <div class="grid g-2">
+            <article class="card" style="padding:18px;"><div class="icon-box">↗</div><h3>Domain & TLS</h3><p>Domain publik mengarah ke layanan aplikasi dan dilayani melalui HTTPS.</p></article>
+            <article class="card" style="padding:18px;"><div class="icon-box">⚙</div><h3>Service backend</h3><p>Node API dijalankan sebagai service agar proses dapat dikelola oleh sistem.</p></article>
+            <article class="card" style="padding:18px;"><div class="icon-box">▤</div><h3>Reverse proxy</h3><p>Nginx menyajikan frontend dan meneruskan request API ke backend.</p></article>
+            <article class="card" style="padding:18px;"><div class="icon-box">⛁</div><h3>Database & backup</h3><p>MySQL menyimpan data aplikasi; backup database disiapkan sebelum migrasi.</p></article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 18: PENGUJIAN -->
+    <section class="slide" data-title="Pengujian" data-mode="light" data-bg="#eef3e3" data-ink="#203328" data-soft="#3e5648" data-muted="#5f7869" data-accent="#4b7536" data-accent2="#187d6b" data-card="rgba(255,255,255,0.85)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 17 · Kualitas & validasi</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Diukur dengan <span class="serif-accent">alur nyata.</span></h2>
+          <p class="head-desc">Pengujian memeriksa aturan bisnis penting dan validasi deployment memeriksa layanan pada domain.</p>
+        </div>
+        <div class="grid g-3 stagger" style="--d:2">
+          <article class="card"><div class="icon-box">✓</div><h3>API & aturan bisnis</h3><p>Pengujian backend mencakup validasi request, transaksi, dan perilaku endpoint.</p></article>
+          <article class="card"><div class="icon-box">↔</div><h3>Peran & halaman</h3><p>Route aplikasi dipetakan untuk admin, wali, dan kasir dengan menu sesuai tugas.</p></article>
+          <article class="card"><div class="icon-box">◎</div><h3>Deployment</h3><p>HTTPS, reverse proxy, dan layanan publik diverifikasi setelah penerapan.</p></article>
+        </div>
+        <div class="callout stagger" style="--d:3">
+          <span>🧪</span>
+          <span>Cakupan pengujian yang dijalankan dapat berubah saat source code berkembang. Validasi ini tidak menggantikan uji penerimaan pengguna.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 19: CAKUPAN / HASIL AKHIR -->
+    <section class="slide" data-title="Cakupan" data-mode="light" data-bg="#f4e8d8" data-ink="#342922" data-soft="#57473d" data-muted="#78665b" data-accent="#b54f34" data-accent2="#2c7a72" data-card="rgba(255,255,255,0.82)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 18 · Hasil akhir</span>
+        <h2 class="stagger" style="--d:1">Fondasi yang siap <span class="serif-accent">dikembangkan.</span></h2>
+        <div class="grid g-2 stagger" style="--d:2; margin-top:20px;">
+          <article class="card"><div class="icon-box">01</div><h3>Sudah ada</h3><p>Dashboard per peran, pengelolaan santri dan wali, transaksi kantin, saldo, limit, katalog, laporan, persetujuan, audit, serta integrasi pembayaran dan notifikasi.</p></article>
+          <article class="card"><div class="icon-box">02</div><h3>Arsitektur terpisah</h3><p>React SPA berkomunikasi dengan API Express, data tersimpan di MySQL, dan Nginx menangani akses web.</p></article>
+          <article class="card"><div class="icon-box">03</div><h3>Operasi finansial tertelusur</h3><p>Ledger transaksi, validasi server, idempotensi, dan log aktivitas menjadi bagian dari implementasi.</p></article>
+          <article class="card"><div class="icon-box">04</div><h3>Siap dipresentasikan</h3><p>Galeri 16 aset desain UI, peta menu tiap peran, model data inti, integrasi, dan alur deployment dirangkum dalam deck ini.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 20: CATATAN VISUAL -->
+    <section class="slide" data-title="Catatan visual" data-mode="dark" data-bg="#1b2432" data-ink="#f2f1e9" data-soft="#d8dce0" data-muted="#a2abb5" data-accent="#ffc774" data-accent2="#89d9c1" data-card="rgba(34,45,62,0.75)">
+      <div class="wrap">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 19 · Cara membaca galeri</span>
+        <h2 class="stagger" style="--d:1">Jelas soal yang <span class="serif-accent">sudah dibangun.</span></h2>
+        <div class="grid g-4 stagger" style="--d:2; margin-top:20px;">
+          <article class="card"><div class="icon-box">▧</div><h3>Gambar layar</h3><p>Galeri menggunakan 16 aset desain UI PondokPay yang tersimpan di repositori. Gambar menunjukkan rancangan layar dan contoh data.</p></article>
+          <article class="card"><div class="icon-box">⌘</div><h3>Menu & route</h3><p>Menu dijelaskan berdasarkan route dan komponen aplikasi saat ini, bukan diasumsikan dari mockup.</p></article>
+          <article class="card"><div class="icon-box">!</div><h3>Batas cakupan screenshot</h3><p>Repositori menyediakan 16 gambar layar desain; tidak semua route administrasi tambahan memiliki mockup terpisah.</p></article>
+          <article class="card"><div class="icon-box">◎</div><h3>Privasi produksi</h3><p>Deck tidak mengambil tangkapan layar akun produksi atau data pengguna. Nilai pada mockup adalah contoh.</p></article>
+        </div>
+        <div class="callout stagger" style="--d:3">
+          <span>📌</span>
+          <span>Untuk dokumentasi operasional, tambahkan screenshot aktual tiap halaman setelah data demonstrasi dan akun uji disiapkan secara aman.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 21: PETA SEMUA LAYAR -->
+    <section class="slide" data-title="Peta semua layar" data-mode="dark" data-bg="#0e161d" data-ink="#eef4f7" data-soft="#cfe0e8" data-muted="#97aebc" data-accent="#87e2cc" data-accent2="#8db9ff" data-card="rgba(20,31,41,0.78)">
+      <div class="wrap wide">
+        <span class="eyebrow stagger" style="--d:0"><span class="eyebrow-dot"></span> 20 · Semua layar desain</span>
+        <div class="head-split stagger" style="--d:1">
+          <h2>Jelajahi <span class="serif-accent">galeri lengkap.</span></h2>
+          <p class="head-desc">Pilih peran untuk menyaring. Klik kartu untuk membuka layar dan gunakan tombol panah di viewer.</p>
+        </div>
+        <div class="filter-row stagger" style="--d:2" role="group" aria-label="Filter layar berdasarkan peran">
+          <button class="pill-btn active" type="button" data-gfilter="semua">Semua · 16</button>
+          <button class="pill-btn" type="button" data-gfilter="admin">Admin · 7</button>
+          <button class="pill-btn" type="button" data-gfilter="wali">Wali · 3</button>
+          <button class="pill-btn" type="button" data-gfilter="kasir">Kasir · 6</button>
+        </div>
+        <div class="gal-grid stagger" style="--d:3" data-gallery="semua"></div>
+        <p style="margin-top:12px;font-size:11px;color:var(--ink-muted);">Screenshot desain UI dengan contoh data. Lihat menu implementasi per peran untuk halaman yang belum memiliki aset gambar terpisah.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 22: PENUTUP -->
+    <section class="slide" data-title="Penutup" data-mode="light" data-bg="#ddebd8" data-ink="#15352d" data-soft="#34574c" data-muted="#527065" data-accent="#0e7253" data-accent2="#267c72" data-card="rgba(255,255,255,0.75)">
+      <div class="wrap" style="text-align:center;">
+        <div class="brand-logo stagger" style="--d:0; width:78px; height:78px; font-size:34px; border-radius:24px; margin:0 auto 24px; color:#fff;">P</div>
+        <span class="eyebrow stagger" style="--d:1"><span class="eyebrow-dot"></span> PondokPay · Rubaya</span>
+        <h2 class="stagger" style="--d:2; font-size:clamp(50px, 9vw, 114px);">Transaksi lebih <span class="serif-accent">tertata.</span></h2>
+        <p class="lead stagger" style="--d:3; margin:0 auto 28px;">Satu platform untuk membantu pondok, keluarga, dan kantin bergerak dalam alur yang sama.</p>
+        <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;" class="stagger" style="--d:4">
+          <span class="eyebrow" style="margin:0;">Node.js</span>
+          <span class="eyebrow" style="margin:0;">React</span>
+          <span class="eyebrow" style="margin:0;">MySQL</span>
+          <span class="eyebrow" style="margin:0;">pondokpay.rubaya.tech</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Hints & Floating Dock -->
+  <div class="key-hints">
+    <span><kbd style="padding:2px 5px;border:1px solid var(--border);border-radius:4px;">←</kbd> <kbd style="padding:2px 5px;border:1px solid var(--border);border-radius:4px;">→</kbd> Navigasi</span>
+    <span><kbd style="padding:2px 5px;border:1px solid var(--border);border-radius:4px;">Ctrl+K</kbd> / <kbd style="padding:2px 5px;border:1px solid var(--border);border-radius:4px;">O</kbd> Peta Slide</span>
+    <span><kbd style="padding:2px 5px;border:1px solid var(--border);border-radius:4px;">F</kbd> Fullscreen</span>
+    <span><kbd style="padding:2px 5px;border:1px solid var(--border);border-radius:4px;">P</kbd> Cetak PDF</span>
+  </div>
+
+  <nav class="dock" aria-label="Navigasi presentasi">
+    <button id="prev" type="button" aria-label="Slide sebelumnya" title="Sebelumnya">←</button>
+    <span class="dock-counter" id="dock-counter">01 / 22</span>
+    <button id="next" type="button" aria-label="Slide berikutnya" title="Berikutnya">→</button>
+  </nav>
+
+  <!-- Command Palette Modal -->
+  <div class="modal-backdrop" id="palette-modal" aria-hidden="true">
+    <div class="palette-card" role="dialog" aria-modal="true" aria-labelledby="pal-heading">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <span class="eyebrow" style="margin-bottom:6px;"><span class="eyebrow-dot"></span> Peta Presentasi</span>
+          <h2 id="pal-heading" style="font-size:28px;margin:0;color:#f3f7f4;">Ke mana <span style="font-family:var(--font-serif);font-style:italic;color:#cbff63;">selanjutnya?</span></h2>
+        </div>
+        <button type="button" class="btn-secondary" id="close-palette" style="padding:6px 13px;font-size:18px;color:#f3f7f4;">×</button>
+      </div>
+      <input type="text" class="palette-input" id="palette-search" placeholder="Cari nomor atau judul slide (misal: arsitektur, database, keamanan, kasir, simulasi)...">
+      <div class="palette-list" id="palette-list"></div>
+    </div>
+  </div>
+
+  <!-- Lightbox Modal -->
+  <div class="modal-backdrop" id="viewer-modal" aria-hidden="true">
+    <div class="lb-box" role="dialog" aria-modal="true" aria-label="Pratinjau screenshot">
+      <button class="lb-btn lb-close" id="close-viewer" type="button" aria-label="Tutup">×</button>
+      <button class="lb-btn lb-prev" id="viewer-prev" type="button" aria-label="Gambar sebelumnya">‹</button>
+      <img id="viewer-image" alt="" title="Klik gambar untuk zoom">
+      <div id="viewer-caption" style="margin-top:12px;font-size:13px;color:#c7d4cc;"></div>
+      <button class="lb-btn lb-next" id="viewer-next" type="button" aria-label="Gambar berikutnya">›</button>
+    </div>
+  </div>
+
+  <script>
+    const shots = [
+      { role: 'admin', title: 'Masuk', desc: 'Akses awal aplikasi PondokPay.', src: 'Presentasi_PondokPay_Screenshots/admin-masuk.png' },
+      { role: 'admin', title: 'Ringkasan admin', desc: 'Ikhtisar operasional dan keuangan.', src: 'Presentasi_PondokPay_Screenshots/admin-ringkasan.png' },
+      { role: 'admin', title: 'Data santri', desc: 'Daftar dan pengelolaan data santri.', src: 'Presentasi_PondokPay_Screenshots/admin-data-santri.png' },
+      { role: 'admin', title: 'Detail santri & top-up', desc: 'Profil santri, saldo, dan pengisian saldo.', src: 'Presentasi_PondokPay_Screenshots/admin-detail-santri-topup.png' },
+      { role: 'admin', title: 'Kantin & kasir', desc: 'Pengelolaan kantin dan penugasan kasir.', src: 'Presentasi_PondokPay_Screenshots/admin-kantin-kasir.png' },
+      { role: 'admin', title: 'Orang tua & wali', desc: 'Daftar dan hubungan akun wali dengan santri.', src: 'Presentasi_PondokPay_Screenshots/admin-orangtua-wali.png' },
+      { role: 'admin', title: 'Riwayat transaksi', desc: 'Pemeriksaan aktivitas transaksi.', src: 'Presentasi_PondokPay_Screenshots/admin-riwayat-transaksi.png' },
+      { role: 'wali', title: 'Beranda anak', desc: 'Saldo dan aktivitas terbaru anak.', src: 'Presentasi_PondokPay_Screenshots/wali-beranda-anak.png' },
+      { role: 'wali', title: 'Riwayat & detail transaksi', desc: 'Transparansi transaksi anak.', src: 'Presentasi_PondokPay_Screenshots/wali-riwayat-transaksi.png' },
+      { role: 'wali', title: 'Atur limit harian', desc: 'Kontrol batas belanja anak.', src: 'Presentasi_PondokPay_Screenshots/wali-atur-limit.png' },
+      { role: 'kasir', title: 'Beranda & pencarian', desc: 'Identifikasi santri sebelum belanja.', src: 'Presentasi_PondokPay_Screenshots/kasir-beranda-pencarian.png' },
+      { role: 'kasir', title: 'Input pembelian', desc: 'Pilih produk dan susun keranjang.', src: 'Presentasi_PondokPay_Screenshots/kasir-input-pembelian.png' },
+      { role: 'kasir', title: 'Verifikasi keamanan', desc: 'Tahap pemeriksaan sebelum transaksi.', src: 'Presentasi_PondokPay_Screenshots/kasir-verifikasi-keamanan.png' },
+      { role: 'kasir', title: 'Konfirmasi pembayaran', desc: 'Tinjau dan konfirmasi nilai belanja.', src: 'Presentasi_PondokPay_Screenshots/kasir-konfirmasi-pembayaran.png' },
+      { role: 'kasir', title: 'Pembayaran berhasil', desc: 'Status transaksi selesai.', src: 'Presentasi_PondokPay_Screenshots/kasir-pembayaran-berhasil.png' },
+      { role: 'kasir', title: 'Riwayat kantin', desc: 'Telusuri catatan transaksi kantin.', src: 'Presentasi_PondokPay_Screenshots/kasir-riwayat-kantin.png' }
+    ];
+
+    const roleNames = { admin: 'Admin', wali: 'Wali', kasir: 'Kasir' };
+    const slides = [...document.querySelectorAll('.slide')];
+    let activeSlide = 0;
+    let activeShot = 0;
+    let soundEnabled = false;
+    let audioCtx = null;
+
+    // Synthesized Web Audio Click Feedback
+    function playClickTone(freq = 520) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      } catch (e) {}
+    }
+
+    document.getElementById('sound-toggle').addEventListener('click', (e) => {
+      soundEnabled = !soundEnabled;
+      e.currentTarget.textContent = soundEnabled ? '🔊 Audio' : '🔇 Audio';
+      e.currentTarget.classList.toggle('active', soundEnabled);
+      if (soundEnabled) playClickTone(660);
+    });
+
+    // High-Resolution SVG Mockup Generator Fallback for Local Screenshots
+    function buildMockupFallback(shot) {
+      const palette = {
+        admin: { bg: '#0c151c', card: '#14222d', accent: '#87e2cc', label: 'ADMIN CONSOLE' },
+        wali: { bg: '#181f29', card: '#222c3a', accent: '#e7c77f', label: 'WALI MOBILE APP' },
+        kasir: { bg: '#1c1713', card: '#29211b', accent: '#ffb451', label: 'KASIR POS TERMINAL' }
+      }[shot.role];
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+        <rect width="800" height="500" fill="${palette.bg}"/>
+        <rect x="24" y="22" width="752" height="44" rx="12" fill="${palette.card}"/>
+        <circle cx="48" cy="44" r="6" fill="${palette.accent}"/>
+        <text x="66" y="49" fill="#f3f7f4" font-family="sans-serif" font-size="14" font-weight="bold">PondokPay · ${palette.label}</text>
+        <rect x="24" y="84" width="200" height="392" rx="16" fill="${palette.card}"/>
+        <rect x="44" y="108" width="140" height="12" rx="6" fill="${palette.accent}" opacity="0.85"/>
+        <rect x="44" y="136" width="160" height="10" rx="5" fill="#ffffff" opacity="0.16"/>
+        <rect x="44" y="160" width="120" height="10" rx="5" fill="#ffffff" opacity="0.12"/>
+        <rect x="44" y="184" width="148" height="10" rx="5" fill="#ffffff" opacity="0.12"/>
+        <rect x="242" y="84" width="534" height="150" rx="16" fill="${palette.card}" stroke="${palette.accent}" stroke-opacity="0.4"/>
+        <text x="270" y="142" fill="${palette.accent}" font-family="sans-serif" font-size="25" font-weight="bold">${shot.title}</text>
+        <text x="270" y="174" fill="#cbd5e1" font-family="sans-serif" font-size="14">${shot.desc}</text>
+        <rect x="242" y="252" width="258" height="224" rx="16" fill="${palette.card}"/>
+        <rect x="518" y="252" width="258" height="224" rx="16" fill="${palette.card}"/>
+      </svg>`;
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
+    function renderGallery(container, items) {
+      container.innerHTML = '';
+      items.forEach((shot) => {
+        const idx = shots.indexOf(shot);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'gal-card';
+        btn.innerHTML = `
+          <div class="gal-thumb">
+            <img src="${shot.src}" alt="${roleNames[shot.role]} — ${shot.title}" loading="lazy">
+          </div>
+          <div class="gal-meta">
+            <div>
+              <strong>${shot.title}</strong>
+              <small>${roleNames[shot.role]} · ${shot.desc}</small>
+            </div>
+            <span style="color:var(--accent);font-size:15px;">↗</span>
+          </div>
+        `;
+        const img = btn.querySelector('img');
+        img.onerror = () => { img.src = buildMockupFallback(shot); };
+        btn.addEventListener('click', () => { playClickTone(600); openViewer(idx); });
+        container.appendChild(btn);
+      });
+    }
+
+    document.querySelectorAll('[data-gallery="admin"],[data-gallery="wali"],[data-gallery="kasir"]').forEach(el => {
+      renderGallery(el, shots.filter(s => s.role === el.dataset.gallery));
+    });
+    const allGallery = document.querySelector('[data-gallery="semua"]');
+    renderGallery(allGallery, shots);
+
+    document.querySelectorAll('[data-gfilter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(540);
+        document.querySelectorAll('[data-gfilter]').forEach(b => b.classList.toggle('active', b === btn));
+        const role = btn.dataset.gfilter;
+        renderGallery(allGallery, role === 'semua' ? shots : shots.filter(s => s.role === role));
+      });
+    });
+
+    // Build 22-Segment Scrubber Bar
+    const segmentBar = document.getElementById('segment-bar');
+    slides.forEach((s, i) => {
+      const seg = document.createElement('button');
+      seg.type = 'button';
+      seg.className = 'seg-item';
+      seg.title = `${String(i + 1).padStart(2, '0')} · ${s.dataset.title}`;
+      seg.addEventListener('click', () => goToSlide(i));
+      segmentBar.appendChild(seg);
+    });
+
+    // Slide Transition & Dynamic Theme Morphing
+    function goToSlide(index) {
+      activeSlide = Math.max(0, Math.min(slides.length - 1, index));
+      playClickTone(480 + activeSlide * 8);
+      slides.forEach((s, i) => {
+        s.classList.toggle('active', i === activeSlide);
+        if (i === activeSlide) s.scrollTop = 0;
+      });
+
+      const cur = slides[activeSlide];
+      const root = document.documentElement.style;
+      root.setProperty('--bg', cur.dataset.bg);
+      root.setProperty('--ink', cur.dataset.ink);
+      root.setProperty('--ink-soft', cur.dataset.soft);
+      root.setProperty('--ink-muted', cur.dataset.muted);
+      root.setProperty('--accent', cur.dataset.accent);
+      root.setProperty('--accent-2', cur.dataset.accent2);
+      root.setProperty('--card-bg', cur.dataset.card);
+      document.body.classList.toggle('light-theme', cur.dataset.mode === 'light');
+
+      document.querySelectorAll('.seg-item').forEach((seg, i) => {
+        seg.classList.toggle('passed', i < activeSlide);
+        seg.classList.toggle('current', i === activeSlide);
+      });
+
+      document.getElementById('dock-counter').textContent = `${String(activeSlide + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
+      document.title = `${cur.dataset.title} · PondokPay`;
+      renderPalette(document.getElementById('palette-search').value);
+    }
+
+    document.getElementById('prev').addEventListener('click', () => goToSlide(activeSlide - 1));
+    document.getElementById('next').addEventListener('click', () => goToSlide(activeSlide + 1));
+    document.getElementById('go-home').addEventListener('click', () => goToSlide(0));
+
+    // Auto-Play Presentation Mode
+    let autoPlayTimer = null;
+    document.getElementById('autoplay-toggle').addEventListener('click', (e) => {
+      if (autoPlayTimer) {
+        clearInterval(autoPlayTimer);
+        autoPlayTimer = null;
+        e.currentTarget.textContent = '▶ Auto';
+        e.currentTarget.classList.remove('active');
+      } else {
+        e.currentTarget.textContent = '⏸ Auto';
+        e.currentTarget.classList.add('active');
+        autoPlayTimer = setInterval(() => {
+          goToSlide((activeSlide + 1) % slides.length);
+        }, 5500);
+      }
+    });
+
+    // Elapsed Presentation Timer
+    const startTime = Date.now();
+    setInterval(() => {
+      const sec = Math.floor((Date.now() - startTime) / 1000);
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      document.getElementById('pres-timer').textContent = `${m}:${s}`;
+    }, 1000);
+
+    // 3D Holographic Card Tilt (Slide 1)
+    const holoCard = document.getElementById('holo-card');
+    if (holoCard) {
+      holoCard.addEventListener('mousemove', (e) => {
+        const r = holoCard.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5;
+        const y = (e.clientY - r.top) / r.height - 0.5;
+        holoCard.style.transform = `rotateY(${x * 18}deg) rotateX(${-y * 18}deg)`;
+        holoCard.style.setProperty('--glare-x', `${(x + 0.5) * 100}%`);
+        holoCard.style.setProperty('--glare-y', `${(y + 0.5) * 100}%`);
+      });
+      holoCard.addEventListener('mouseleave', () => {
+        holoCard.style.transform = 'rotateY(0deg) rotateX(0deg)';
+      });
+    }
+
+    // Cursor Spotlight on Cards
+    document.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      document.querySelectorAll('.slide.active .card').forEach(c => {
+        const r = c.getBoundingClientRect();
+        c.style.setProperty('--mx', `${e.clientX - r.left}px`);
+        c.style.setProperty('--my', `${e.clientY - r.top}px`);
+      });
+    }, { passive: true });
+
+    // Slide 3: Before vs After Toggle
+    document.querySelectorAll('#pain-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(560);
+        document.querySelectorAll('#pain-toggle button').forEach(b => b.classList.toggle('active', b === btn));
+        const state = btn.dataset.state;
+        document.querySelectorAll('#persona-cards p').forEach(p => {
+          p.textContent = p.dataset[state];
+        });
+      });
+    });
+
+    // Slide 4: Architecture Flow Scenarios & Node Inspector
+    const archScenarios = {
+      pos: `{
+  "flow": "POST /api/kasir/sales",
+  "headers": { "Authorization": "Bearer JWT", "Idempotency-Key": "uuid-v4" },
+  "pipeline": ["Nginx Proxy", "Express Auth & Limit Check", "MySQL ACID Ledger", "WA Outbox"]
+}`,
+      topup: `{
+  "flow": "POST /api/wali/topup -> Midtrans Webhook",
+  "channel": "QRIS / Virtual Account",
+  "pipeline": ["Wali Intent", "Midtrans Snap API", "Webhook Signature Verify", "MySQL Credit Santri"]
+}`,
+      wali: `{
+  "flow": "GET /api/wali/dashboard & PUT /api/wali/limit",
+  "relation": "wali_santri -> santri (Multi-Santri)",
+  "pipeline": ["React PWA", "Nginx TLS", "Express Role Guard", "MySQL Read & Limit Update"]
+}`
+    };
+    document.querySelectorAll('[data-flow-scenario]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(580);
+        document.querySelectorAll('[data-flow-scenario]').forEach(b => b.classList.toggle('active', b === btn));
+        document.getElementById('arch-json').textContent = archScenarios[btn.dataset.flowScenario];
+        document.querySelectorAll('.arch-node').forEach((n, idx) => {
+          n.classList.remove('pulse-hit');
+          setTimeout(() => n.classList.add('pulse-hit'), idx * 140);
+        });
+      });
+    });
+
+    const nodeDetails = [
+      '{\n  "layer": "Browser / PWA (React 18 + Vite 6)",\n  "security": "HTTPS TLS + JWT Storage + Protected Role Routes"\n}',
+      '{\n  "layer": "Nginx Reverse Proxy",\n  "routing": "Menyajikan aset statis frontend & meneruskan /api/* ke Node.js"\n}',
+      '{\n  "layer": "Node.js + Express 5 REST API",\n  "logic": "Autentikasi, validasi saldo/limit harian, idempotensi, & worker WA"\n}',
+      '{\n  "layer": "MySQL Relational Database (InnoDB)",\n  "integrity": "Foreign key relasional, transaksi ACID ledger, & audit_logs"\n}'
+    ];
+    document.querySelectorAll('.arch-node').forEach(node => {
+      node.addEventListener('click', () => {
+        playClickTone(600);
+        document.querySelectorAll('.arch-node').forEach(n => n.classList.remove('active-node'));
+        node.classList.add('active-node');
+        document.getElementById('arch-json').textContent = nodeDetails[Number(node.dataset.nid)];
+      });
+    });
+
+    // Slide 5: Tech Stack Filter
+    document.querySelectorAll('#stack-filter button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(540);
+        document.querySelectorAll('#stack-filter button').forEach(b => b.classList.toggle('active', b === btn));
+        const cat = btn.dataset.scat;
+        document.querySelectorAll('#stack-grid .tech-card').forEach(card => {
+          card.classList.toggle('dim', cat !== 'all' && card.dataset.scat !== cat);
+        });
+      });
+    });
+
+    // Slide 6: ERD Table Relation & Column Highlighter
+    document.querySelectorAll('.tbl-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(610);
+        const target = btn.dataset.t;
+        const links = (btn.dataset.links || '').split(',');
+        document.querySelectorAll('.tbl-btn').forEach(b => {
+          b.classList.remove('selected', 'linked');
+          if (b.dataset.t === target) b.classList.add('selected');
+          else if (links.includes(b.dataset.t)) b.classList.add('linked');
+        });
+        document.getElementById('erd-tbl-name').textContent = `${target}:`;
+        document.getElementById('erd-tbl-cols').textContent = btn.dataset.cols;
+      });
+    });
+
+    // Slide 8: Security Stress Test
+    document.querySelectorAll('[data-sec]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(440);
+        document.getElementById('sec-output').textContent = btn.dataset.sec;
+      });
+    });
+
+    // Slides 9, 11, 13: Role Menu Wireframe Inspectors
+    function bindRoleInspector(attr, prefix) {
+      document.querySelectorAll(`[${attr}]`).forEach(btn => {
+        btn.addEventListener('click', () => {
+          playClickTone(580);
+          document.querySelectorAll(`[${attr}]`).forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const [title, route, desc] = btn.getAttribute(attr).split('|');
+          document.getElementById(`${prefix}-title`).textContent = title;
+          document.getElementById(`${prefix}-route`).textContent = route;
+          document.getElementById(`${prefix}-desc`).textContent = desc;
+        });
+      });
+    }
+    bindRoleInspector('data-awf', 'awf');
+    bindRoleInspector('data-wwf', 'wwf');
+    bindRoleInspector('data-kwf', 'kwf');
+
+    // Slide 15: Full Interactive POS & Wali Simulator
+    let simSantri = 'Ahmad Fauzan';
+    let simSantriBal = 45000;
+    let simKantinBal = 150000;
+    let simLimit = 25000;
+    let simCart = [
+      { n: 'Nasi Ayam', p: 12000 },
+      { n: 'Es Teh', p: 5000 }
+    ];
+    const rp = (v) => 'Rp ' + v.toLocaleString('id-ID');
+
+    function refreshPosUI() {
+      document.getElementById('pos-sname').textContent = simSantri;
+      document.getElementById('pos-sbal').textContent = rp(simSantriBal);
+      document.getElementById('pos-kbal').textContent = rp(simKantinBal);
+      document.getElementById('pos-limit-lbl').textContent = rp(simLimit);
+      const tot = simCart.reduce((a, b) => a + b.p, 0);
+      document.getElementById('pos-cart-tot').textContent = rp(tot);
+      document.getElementById('pos-cart-list').textContent = simCart.length ? `(${simCart.map(i => i.n).join(', ')})` : '(Kosong)';
+    }
+
+    document.querySelectorAll('.santri-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        playClickTone(560);
+        document.querySelectorAll('.santri-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        simSantri = chip.dataset.sname;
+        simSantriBal = Number(chip.dataset.sbal);
+        refreshPosUI();
+      });
+    });
+
+    document.getElementById('pos-limit-range').addEventListener('input', (e) => {
+      simLimit = Number(e.target.value);
+      refreshPosUI();
+    });
+
+    document.querySelectorAll('.snack-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(640);
+        simCart.push({ n: btn.dataset.n, p: Number(btn.dataset.p) });
+        refreshPosUI();
+      });
+    });
+
+    document.getElementById('pos-clear').addEventListener('click', () => {
+      playClickTone(420);
+      simCart = [];
+      document.querySelectorAll('.step-node').forEach(n => n.classList.remove('active', 'done'));
+      document.getElementById('pos-log').innerHTML = '[KERANJANG DIKOSONGKAN] Silakan pilih item belanja kantin.';
+      refreshPosUI();
+    });
+
+    document.getElementById('pos-submit').addEventListener('click', () => {
+      const tot = simCart.reduce((a, b) => a + b.p, 0);
+      if (tot <= 0) return;
+      const btn = document.getElementById('pos-submit');
+      const logBox = document.getElementById('pos-log');
+      const nodes = [...document.querySelectorAll('.step-node')];
+      btn.disabled = true;
+      nodes.forEach(n => n.classList.remove('active', 'done'));
+
+      let s = 0;
+      const lines = [
+        `[1. IDENTIFIKASI] Santri: ${simSantri} | Unit: Kantin Utama`,
+        `[2. SUSUN BELANJA] ${simCart.length} item · Total tagihan: ${rp(tot)}`,
+        `[3. VALIDASI SERVER] Cek saldo (${rp(simSantriBal)}) & limit wali (${rp(simLimit)})...`
+      ];
+
+      const tick = () => {
+        if (s > 0) { nodes[s - 1].classList.remove('active'); nodes[s - 1].classList.add('done'); }
+        if (s < 3) {
+          playClickTone(520 + s * 60);
+          nodes[s].classList.add('active');
+          logBox.innerHTML = lines.slice(0, s + 1).join('<br>');
+          s++;
+          setTimeout(tick, 480);
+        } else if (s === 3) {
+          if (tot > simSantriBal) {
+            playClickTone(260);
+            logBox.innerHTML += `<br><span style="color:#fb7185;">[DITOLAK SERVER] Saldo ${simSantri} tidak cukup (${rp(simSantriBal)} < ${rp(tot)}).</span>`;
+            btn.disabled = false;
+            return;
+          }
+          if (tot > simLimit) {
+            playClickTone(260);
+            logBox.innerHTML += `<br><span style="color:#fbbf24;">[DITOLAK SERVER] Melebihi limit harian wali (${rp(simLimit)}).</span>`;
+            btn.disabled = false;
+            return;
+          }
+          playClickTone(720);
+          nodes[3].classList.add('active');
+          simSantriBal -= tot;
+          simKantinBal += tot;
+          refreshPosUI();
+          logBox.innerHTML += `<br><span style="color:#cbff63;">[4. CATAT LEDGER] transaksi: -${rp(tot)} | kantin_transaksi: +${rp(tot)}</span>`;
+          s++;
+          setTimeout(tick, 520);
+        } else {
+          playClickTone(840);
+          nodes[3].classList.remove('active');
+          nodes[3].classList.add('done');
+          nodes[4].classList.add('done');
+          logBox.innerHTML += `<br><span style="color:#2dd4bf;">[5. KONFIRMASI] Sukses! Idempotency-Key tersimpan & antrean WhatsApp wali dibuat.</span>`;
+          simCart = [];
+          refreshPosUI();
+          btn.disabled = false;
+        }
+      };
+      tick();
+    });
+
+    // Slide 17: Interactive VPS Terminal Commands
+    const vpsOutputs = {
+      tree: `<strong style="color:#86efac;">pondokpay.rubaya.tech</strong><br>├── <span style="color:#2dd4bf;">HTTPS</span> · Let's Encrypt<br>├── <span style="color:#2dd4bf;">Nginx</span> · reverse proxy<br>├── <span style="color:#2dd4bf;">Node.js</span> · systemd service<br>└── <span style="color:#2dd4bf;">MySQL</span> · relational database`,
+      tls: `<span style="color:#86efac;">$ curl -I https://pondokpay.rubaya.tech</span><br>HTTP/2 200 OK<br>server: nginx<br>strict-transport-security: max-age=31536000<br>content-type: text/html; charset=utf-8`,
+      sys: `<span style="color:#86efac;">$ systemctl status pondokpay-api</span><br>● pondokpay-api.service - PondokPay Express REST API<br>&nbsp;&nbsp;&nbsp;Loaded: loaded (/etc/systemd/system/pondokpay-api.service; enabled)<br>&nbsp;&nbsp;&nbsp;Active: <strong style="color:#86efac;">active (running)</strong> · Memory: 68.4M`,
+      db: `<span style="color:#86efac;">$ mysqldump --single-transaction pondokpay_db &gt; backup_pre_migrate.sql</span><br>[OK] Snapshot skema & data ledger terverifikasi sebelum migrasi.`
+    };
+    document.querySelectorAll('.vps-cmd-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        playClickTone(580);
+        document.querySelectorAll('.vps-cmd-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('vps-output').innerHTML = vpsOutputs[btn.dataset.cmd];
+      });
+    });
+
+    // Command Palette Modal
+    const paletteModal = document.getElementById('palette-modal');
+    const paletteList = document.getElementById('palette-list');
+    const paletteSearch = document.getElementById('palette-search');
+
+    function renderPalette(q = '') {
+      const term = q.trim().toLowerCase();
+      paletteList.innerHTML = '';
+      slides.forEach((s, i) => {
+        const title = s.dataset.title;
+        const num = String(i + 1).padStart(2, '0');
+        if (term && !title.toLowerCase().includes(term) && !num.includes(term)) return;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'pal-item' + (i === activeSlide ? ' active' : '');
+        item.innerHTML = `<span>SLIDE ${num}</span><strong>${title}</strong>`;
+        item.addEventListener('click', () => { goToSlide(i); togglePalette(false); });
+        paletteList.appendChild(item);
+      });
+    }
+    function togglePalette(open) {
+      paletteModal.classList.toggle('open', open);
+      paletteModal.setAttribute('aria-hidden', String(!open));
+      if (open) { paletteSearch.value = ''; renderPalette(); setTimeout(() => paletteSearch.focus(), 40); }
+    }
+    document.getElementById('open-palette').addEventListener('click', () => togglePalette(true));
+    document.getElementById('close-palette').addEventListener('click', () => togglePalette(false));
+    paletteModal.addEventListener('click', e => { if (e.target === paletteModal) togglePalette(false); });
+    paletteSearch.addEventListener('input', e => renderPalette(e.target.value));
+
+    // Lightbox Viewer with Zoom
+    const viewerModal = document.getElementById('viewer-modal');
+    const viewerImg = document.getElementById('viewer-image');
+    const viewerCap = document.getElementById('viewer-caption');
+
+    function openViewer(idx) {
+      activeShot = idx;
+      viewerImg.classList.remove('zoomed');
+      updateViewer();
+      viewerModal.classList.add('open');
+      viewerModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeViewer() {
+      viewerModal.classList.remove('open');
+      viewerModal.setAttribute('aria-hidden', 'true');
+    }
+    function updateViewer() {
+      const shot = shots[activeShot];
+      viewerImg.src = shot.src;
+      viewerImg.onerror = () => { viewerImg.src = buildMockupFallback(shot); };
+      viewerCap.textContent = `${roleNames[shot.role]} · ${shot.title} — ${shot.desc} (${activeShot + 1} / ${shots.length}) · Klik gambar untuk zoom`;
+    }
+    viewerImg.addEventListener('click', () => viewerImg.classList.toggle('zoomed'));
+    document.getElementById('close-viewer').addEventListener('click', closeViewer);
+    document.getElementById('viewer-prev').addEventListener('click', () => { activeShot = (activeShot - 1 + shots.length) % shots.length; viewerImg.classList.remove('zoomed'); updateViewer(); });
+    document.getElementById('viewer-next').addEventListener('click', () => { activeShot = (activeShot + 1) % shots.length; viewerImg.classList.remove('zoomed'); updateViewer(); });
+    viewerModal.addEventListener('click', e => { if (e.target === viewerModal) closeViewer(); });
+
+    // Keyboard & Touch Navigation
+    document.addEventListener('keydown', (e) => {
+      if (viewerModal.classList.contains('open')) {
+        if (e.key === 'Escape') closeViewer();
+        if (e.key === 'ArrowLeft') document.getElementById('viewer-prev').click();
+        if (e.key === 'ArrowRight') document.getElementById('viewer-next').click();
+        return;
+      }
+      if (paletteModal.classList.contains('open')) {
+        if (e.key === 'Escape') togglePalette(false);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); togglePalette(true); return; }
+      if (e.key.toLowerCase() === 'o' && document.activeElement.tagName !== 'INPUT') { togglePalette(true); return; }
+      if (e.key === 'ArrowRight' || (e.key === ' ' && !['BUTTON', 'INPUT'].includes(document.activeElement.tagName))) {
+        e.preventDefault();
+        goToSlide(activeSlide + 1);
+      }
+      if (e.key === 'ArrowLeft') goToSlide(activeSlide - 1);
+      if (e.key.toLowerCase() === 'f') {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+        else document.exitFullscreen?.();
+      }
+      if (e.key.toLowerCase() === 'p') window.print();
+    });
+
+    let tx = 0;
+    document.addEventListener('touchstart', e => { tx = e.changedTouches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const dx = tx - e.changedTouches[0].clientX;
+      if (Math.abs(dx) > 60 && !viewerModal.classList.contains('open') && !paletteModal.classList.contains('open')) {
+        goToSlide(activeSlide + (dx > 0 ? 1 : -1));
+      }
+    }, { passive: true });
+
+    // Lightweight Ambient Canvas Constellation
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      particles = Array.from({ length: Math.min(42, Math.floor(window.innerWidth / 34)) }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        r: Math.random() * 1.8 + 0.8
+      }));
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const isLight = document.body.classList.contains('light-theme');
+      ctx.fillStyle = isLight ? 'rgba(18, 109, 80, 0.25)' : 'rgba(203, 255, 99, 0.28)';
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x = (p.x + p.vx + canvas.width) % canvas.width;
+        p.y = (p.y + p.vy + canvas.height) % canvas.height;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    renderPalette();
+    goToSlide(0);
+  </script>
+</body>
+</html>
